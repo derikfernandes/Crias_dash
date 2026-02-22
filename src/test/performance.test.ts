@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { generateScaleTestData } from './mocks/dataGenerator';
 import { processInBatches } from '../utils/batchProcessor';
-import { cache, getAnswersCacheKey, getCandidatesCacheKey } from '../utils/cache';
+import { cache, getAnswersCacheKey } from '../utils/cache';
 
 describe('Performance Tests - 10.000 Alunos', () => {
   beforeEach(() => {

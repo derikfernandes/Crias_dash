@@ -84,7 +84,7 @@ export const ManageInstitutions = ({
     triggerRefresh();
   };
 
-  const handleInstitutionUpdated = (institution: Institution) => {
+  const handleInstitutionUpdated = (_institution: Institution) => {
     // Disparar refresh global para todas as abas
     triggerRefresh();
     setEditingInstitution(null);

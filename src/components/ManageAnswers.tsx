@@ -164,7 +164,7 @@ export const ManageAnswers = ({ isActive = true }: ManageAnswersProps) => {
     }
   };
 
-  const handleAnswerCreated = (answer: Answer) => {
+  const handleAnswerCreated = (_answer: Answer) => {
     // Disparar refresh global para todas as abas
     triggerRefresh();
     // Recarregar respostas do candidato selecionado
@@ -181,7 +181,7 @@ export const ManageAnswers = ({ isActive = true }: ManageAnswersProps) => {
     setEditingAnswer(null);
   };
 
-  const handleAnswerUpdated = (answer: Answer) => {
+  const handleAnswerUpdated = (_answer: Answer) => {
     // Disparar refresh global para todas as abas
     triggerRefresh();
     // Recarregar respostas do candidato selecionado

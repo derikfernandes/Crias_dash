@@ -124,7 +124,7 @@ export const ManageCandidates = ({ isActive = true }: ManageCandidatesProps) => 
     setEditingCandidate(null);
   };
 
-  const handleCandidateUpdated = (candidate: Candidate) => {
+  const handleCandidateUpdated = (_candidate: Candidate) => {
     // Disparar refresh global para todas as abas
     triggerRefresh();
     setEditingCandidate(null);
@@ -145,7 +145,7 @@ export const ManageCandidates = ({ isActive = true }: ManageCandidatesProps) => 
               <div style={{ marginBottom: '2rem' }}>
                 <CreateCandidateForm
                   institution={selectedInstitution}
-                  onSuccess={(candidate) => {
+                  onSuccess={(_candidate) => {
                     // Disparar refresh global para todas as abas
                     triggerRefresh();
                   }}

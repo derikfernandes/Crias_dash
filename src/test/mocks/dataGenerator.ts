@@ -70,7 +70,7 @@ function generateAnswers(candidateId: string, maxQuestions: number = 66): Answer
     
     answers.push({
       id: `${candidateId}-${question}`,
-      candidateId: parseInt(candidateId) || 0,
+      candidateId: candidateId,
       question,
       answer,
       answeredAt: generateDate(Math.floor(Math.random() * 180)),

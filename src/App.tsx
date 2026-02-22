@@ -444,7 +444,7 @@ function App() {
           if (updatedCandidates.length > 0) {
             // Limpar cache de respostas dos novos candidatos também
             updatedCandidates.forEach((candidate) => {
-              if (candidate.id) {
+              if (candidate.id && selectedInstitution.id) {
                 const answersCacheKey = getAnswersCacheKey(selectedInstitution.id, candidate.id);
                 cache.delete(answersCacheKey);
               }
@@ -735,21 +735,22 @@ function App() {
     const rows: string[] = [headers.map(escapeCSV).join(',')];
 
     candidates.forEach((candidate) => {
-      const answers = answersMap.get(candidate.id) || [];
+      const candidateId = candidate.id || '';
+      const answers = answersMap.get(candidateId) || [];
 
       if (answers.length === 0) {
         // Linha mesmo sem respostas
         rows.push(
           [
-            escapeCSV(institution.name),
-            escapeCSV(institution.id),
-            escapeCSV(candidate.id),
-            escapeCSV(candidate.name),
-            escapeCSV(candidate.whatsapp),
-            escapeCSV(candidate.email),
-            escapeCSV(candidate.document),
-            escapeCSV(candidate.addressLine1),
-            escapeCSV(candidate.city),
+            escapeCSV(institution.name || ''),
+            escapeCSV(institution.id || ''),
+            escapeCSV(candidateId),
+            escapeCSV(candidate.name || ''),
+            escapeCSV(candidate.whatsapp || ''),
+            escapeCSV(candidate.email || ''),
+            escapeCSV(candidate.document || ''),
+            escapeCSV(candidate.addressLine1 || ''),
+            escapeCSV(candidate.city || ''),
             '',
             '',
             '',
@@ -760,30 +761,32 @@ function App() {
         );
       } else {
         answers.forEach((answer) => {
-          const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
-          const formattedAnswer = getFormattedAnswer(answer.question, answer.answer);
-          const options = getQuestionOptions(answer.question);
-          const selectedOption = formattedAnswer !== answer.answer ? formattedAnswer : answer.answer;
-          rows.push(
-            [
-              escapeCSV(institution.name),
-              escapeCSV(institution.id),
-              escapeCSV(candidate.id),
-              escapeCSV(candidate.name),
-              escapeCSV(candidate.whatsapp),
-              escapeCSV(candidate.email),
-              escapeCSV(candidate.document),
-              escapeCSV(candidate.addressLine1),
-              escapeCSV(candidate.city),
-              escapeCSV(answer.question),
-              escapeCSV(QUESTIONS[answer.question] || ''),
-              escapeCSV(getEtapa(answer.question)),
-              escapeCSV(answer.answer),
-              escapeCSV(selectedOption),
-              escapeCSV(options),
-              escapeCSV(date),
-            ].join(',')
-          );
+          if (answer.answeredAt && answer.question !== undefined) {
+            const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
+            const formattedAnswer = getFormattedAnswer(answer.question, answer.answer || '');
+            const options = getQuestionOptions(answer.question);
+            const selectedOption = formattedAnswer !== answer.answer ? formattedAnswer : (answer.answer || '');
+            rows.push(
+              [
+                escapeCSV(institution.name || ''),
+                escapeCSV(institution.id || ''),
+                escapeCSV(candidateId),
+                escapeCSV(candidate.name || ''),
+                escapeCSV(candidate.whatsapp || ''),
+                escapeCSV(candidate.email || ''),
+                escapeCSV(candidate.document || ''),
+                escapeCSV(candidate.addressLine1 || ''),
+                escapeCSV(candidate.city || ''),
+                escapeCSV(answer.question),
+                escapeCSV(QUESTIONS[answer.question] || ''),
+                escapeCSV(getEtapa(answer.question)),
+                escapeCSV(answer.answer || ''),
+                escapeCSV(selectedOption),
+                escapeCSV(options),
+                escapeCSV(date),
+              ].join(',')
+            );
+          }
         });
       }
     });
@@ -834,20 +837,21 @@ function App() {
     const rows: any[][] = [headers];
 
     candidates.forEach((candidate) => {
-      const answers = answersMap.get(candidate.id) || [];
+      const candidateId = candidate.id || '';
+      const answers = answersMap.get(candidateId) || [];
 
       if (answers.length === 0) {
         // Linha mesmo sem respostas
         rows.push([
-          institution.name,
-          institution.id,
-          candidate.id,
-          candidate.name,
-          candidate.whatsapp,
-          candidate.email,
-          candidate.document,
-          candidate.addressLine1,
-          candidate.city,
+          institution.name || '',
+          institution.id || '',
+          candidateId,
+          candidate.name || '',
+          candidate.whatsapp || '',
+          candidate.email || '',
+          candidate.document || '',
+          candidate.addressLine1 || '',
+          candidate.city || '',
           '',
           '',
           '',
@@ -857,28 +861,30 @@ function App() {
         ]);
       } else {
         answers.forEach((answer) => {
-          const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
-          const formattedAnswer = getFormattedAnswer(answer.question, answer.answer);
-          const options = getQuestionOptions(answer.question);
-          const selectedOption = formattedAnswer !== answer.answer ? formattedAnswer : answer.answer;
-          rows.push([
-            institution.name,
-            institution.id,
-            candidate.id,
-            candidate.name,
-            candidate.whatsapp,
-            candidate.email,
-            candidate.document,
-            candidate.addressLine1,
-            candidate.city,
-            answer.question,
-            QUESTIONS[answer.question] || '',
-            getEtapa(answer.question),
-            answer.answer,
-            selectedOption,
-            options,
-            date,
-          ]);
+          if (answer.answeredAt && answer.question !== undefined) {
+            const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
+            const formattedAnswer = getFormattedAnswer(answer.question, answer.answer || '');
+            const options = getQuestionOptions(answer.question);
+            const selectedOption = formattedAnswer !== answer.answer ? formattedAnswer : (answer.answer || '');
+            rows.push([
+              institution.name || '',
+              institution.id || '',
+              candidateId,
+              candidate.name || '',
+              candidate.whatsapp || '',
+              candidate.email || '',
+              candidate.document || '',
+              candidate.addressLine1 || '',
+              candidate.city || '',
+              answer.question,
+              QUESTIONS[answer.question] || '',
+              getEtapa(answer.question),
+              answer.answer || '',
+              selectedOption,
+              options,
+              date,
+            ]);
+          }
         });
       }
     });
@@ -886,7 +892,8 @@ function App() {
     return rows;
   };
 
-  // Função para gerar e fazer download de XLSX
+  // Função para gerar e fazer download de XLSX (não usada, mantida para compatibilidade)
+  // @ts-expect-error - Função mantida para compatibilidade, não está sendo usada
   const downloadXLSX = (
     institution: Institution,
     candidates: Candidate[],
@@ -919,7 +926,7 @@ function App() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Candidatos');
 
-    const sanitizedName = institution.name
+    const sanitizedName = (institution.name || '')
       .replace(/[^a-z0-9]/gi, '_')
       .toLowerCase();
     const date = new Date().toISOString().split('T')[0];
@@ -962,7 +969,7 @@ function App() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Candidatos');
 
-    const sanitizedName = institution.name
+    const sanitizedName = (institution.name || '')
       .replace(/[^a-z0-9]/gi, '_')
       .toLowerCase();
     const etapaSuffix = etapa
@@ -1004,15 +1011,15 @@ function App() {
     if (candidateAnswers.length === 0) {
       rows.push(
         [
-          escapeCSV(institution.name),
-          escapeCSV(institution.id),
-          escapeCSV(candidate.id),
-          escapeCSV(candidate.name),
-          escapeCSV(candidate.whatsapp),
-          escapeCSV(candidate.email),
-          escapeCSV(candidate.document),
-          escapeCSV(candidate.addressLine1),
-            escapeCSV(candidate.city),
+          escapeCSV(institution.name || ''),
+          escapeCSV(institution.id || ''),
+          escapeCSV(candidate.id || ''),
+          escapeCSV(candidate.name || ''),
+          escapeCSV(candidate.whatsapp || ''),
+          escapeCSV(candidate.email || ''),
+          escapeCSV(candidate.document || ''),
+          escapeCSV(candidate.addressLine1 || ''),
+            escapeCSV(candidate.city || ''),
             '',
             '',
             '',
@@ -1023,29 +1030,31 @@ function App() {
       );
     } else {
       candidateAnswers.forEach((answer) => {
-        const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
-        const formattedAnswer = getFormattedAnswer(answer.question, answer.answer);
-        const options = getQuestionOptions(answer.question);
-        rows.push(
-          [
-            escapeCSV(institution.name),
-            escapeCSV(institution.id),
-            escapeCSV(candidate.id),
-            escapeCSV(candidate.name),
-            escapeCSV(candidate.whatsapp),
-            escapeCSV(candidate.email),
-            escapeCSV(candidate.document),
-            escapeCSV(candidate.addressLine1),
-            escapeCSV(candidate.city),
-            escapeCSV(answer.question),
-            escapeCSV(QUESTIONS[answer.question] || ''),
-            escapeCSV(getEtapa(answer.question)),
-            escapeCSV(answer.answer),
-            escapeCSV(formattedAnswer !== answer.answer ? formattedAnswer : answer.answer),
-            escapeCSV(options),
-            escapeCSV(date),
-          ].join(',')
-        );
+        if (answer.answeredAt && answer.question !== undefined) {
+          const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
+          const formattedAnswer = getFormattedAnswer(answer.question, answer.answer || '');
+          const options = getQuestionOptions(answer.question);
+          rows.push(
+            [
+              escapeCSV(institution.name || ''),
+              escapeCSV(institution.id || ''),
+              escapeCSV(candidate.id || ''),
+              escapeCSV(candidate.name || ''),
+              escapeCSV(candidate.whatsapp || ''),
+              escapeCSV(candidate.email || ''),
+              escapeCSV(candidate.document || ''),
+              escapeCSV(candidate.addressLine1 || ''),
+              escapeCSV(candidate.city || ''),
+              escapeCSV(answer.question),
+              escapeCSV(QUESTIONS[answer.question] || ''),
+              escapeCSV(getEtapa(answer.question)),
+              escapeCSV(answer.answer || ''),
+              escapeCSV(formattedAnswer !== answer.answer ? formattedAnswer : (answer.answer || '')),
+              escapeCSV(options),
+              escapeCSV(date),
+            ].join(',')
+          );
+        }
       });
     }
 
@@ -1081,15 +1090,15 @@ function App() {
 
     if (candidateAnswers.length === 0) {
       rows.push([
-        institution.name,
-        institution.id,
-        candidate.id,
-        candidate.name,
-        candidate.whatsapp,
-        candidate.email,
-        candidate.document,
-        candidate.addressLine1,
-        candidate.city,
+        institution.name || '',
+        institution.id || '',
+        candidate.id || '',
+        candidate.name || '',
+        candidate.whatsapp || '',
+        candidate.email || '',
+        candidate.document || '',
+        candidate.addressLine1 || '',
+        candidate.city || '',
         '',
         '',
         '',
@@ -1099,27 +1108,29 @@ function App() {
       ]);
     } else {
       candidateAnswers.forEach((answer) => {
-        const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
-        const formattedAnswer = getFormattedAnswer(answer.question, answer.answer);
-        const options = getQuestionOptions(answer.question);
-        rows.push([
-          institution.name,
-          institution.id,
-          candidate.id,
-          candidate.name,
-          candidate.whatsapp,
-          candidate.email,
-          candidate.document,
-          candidate.addressLine1,
-          candidate.city,
-          answer.question,
-          QUESTIONS[answer.question] || '',
-          getEtapa(answer.question),
-            answer.answer,
-            formattedAnswer !== answer.answer ? formattedAnswer : answer.answer,
+        if (answer.answeredAt && answer.question !== undefined) {
+          const date = new Date(answer.answeredAt).toLocaleString('pt-BR');
+          const formattedAnswer = getFormattedAnswer(answer.question, answer.answer || '');
+          const options = getQuestionOptions(answer.question);
+          rows.push([
+            institution.name || '',
+            institution.id || '',
+            candidate.id || '',
+            candidate.name || '',
+            candidate.whatsapp || '',
+            candidate.email || '',
+            candidate.document || '',
+            candidate.addressLine1 || '',
+            candidate.city || '',
+            answer.question,
+            QUESTIONS[answer.question] || '',
+            getEtapa(answer.question),
+            answer.answer || '',
+            formattedAnswer !== answer.answer ? formattedAnswer : (answer.answer || ''),
             options,
-          date,
-        ]);
+            date,
+          ]);
+        }
       });
     }
 
@@ -1149,7 +1160,7 @@ function App() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Candidato');
 
-    const sanitizedName = candidate.name
+    const sanitizedName = (candidate.name || '')
       .replace(/[^a-z0-9]/gi, '_')
       .toLowerCase();
     const date = new Date().toISOString().split('T')[0];
@@ -1166,6 +1177,7 @@ function App() {
 
     try {
       // Buscar todas as respostas dos candidatos filtrados
+      if (!selectedInstitution.id) return;
       const answersMap = await fetchAllAnswers(
         selectedInstitution.id,
         filteredCandidates
@@ -1180,7 +1192,7 @@ function App() {
         );
 
         // Fazer download
-        const sanitizedName = selectedInstitution.name
+        const sanitizedName = (selectedInstitution.name || '')
           .replace(/[^a-z0-9]/gi, '_')
           .toLowerCase();
         const etapaSuffix = selectedEtapa
@@ -1222,7 +1234,7 @@ function App() {
         );
 
         // Fazer download
-        const sanitizedName = selectedCandidate.name
+        const sanitizedName = (selectedCandidate.name || '')
           .replace(/[^a-z0-9]/gi, '_')
           .toLowerCase();
         const date = new Date().toISOString().split('T')[0];

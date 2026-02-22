@@ -196,7 +196,12 @@ export const EditAnswerForm = ({
                   id="edit-question"
                   name="question"
                   value={formData.question}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      [e.target.name]: e.target.value,
+                    });
+                  }}
                   className="form-input"
                   required
                   disabled={isLoading}

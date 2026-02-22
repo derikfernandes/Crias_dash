@@ -75,8 +75,9 @@ export const InactivityChart = ({
         });
 
         if (lastAnswerDate) {
-          lastAnswerDate.setHours(0, 0, 0, 0);
-          const daysDiff = Math.floor((today.getTime() - lastAnswerDate.getTime()) / (1000 * 60 * 60 * 24));
+          const lastDate = new Date(lastAnswerDate);
+          lastDate.setHours(0, 0, 0, 0);
+          const daysDiff = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
           const days = Math.max(0, daysDiff);
           inactivityMap.set(days, (inactivityMap.get(days) || 0) + 1);
         }

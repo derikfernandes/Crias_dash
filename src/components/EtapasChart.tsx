@@ -48,7 +48,8 @@ export const EtapasChart = ({
     ];
 
     candidates.forEach((candidate) => {
-      const answers = answersMap.get(candidate.id) || [];
+      const candidateId = candidate.id || '';
+      const answers = answersMap.get(candidateId) || [];
       
       if (answers.length === 0) {
         // Se não tem respostas, não conta em nenhuma etapa
@@ -70,7 +71,7 @@ export const EtapasChart = ({
         let maiorNumeroQuestao = -1;
 
         answers.forEach((answer) => {
-          if (answer.question > maiorNumeroQuestao) {
+          if (answer.question !== undefined && answer.question > maiorNumeroQuestao) {
             maiorNumeroQuestao = answer.question;
             etapaMaisAvancada = getEtapa(answer.question);
           }
