@@ -46,6 +46,8 @@ export const CandidatesTable = ({
   const [searchTermCandidate, setSearchTermCandidate] = useState('');
   const [selectedCandidateFilter, setSelectedCandidateFilter] = useState<Candidate | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const candidateFilterRef = useRef<HTMLDivElement>(null);
   const candidateInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,30 +101,85 @@ export const CandidatesTable = ({
     return candidates;
   }, [candidates, selectedCandidateFilter]);
 
+  // Ordenar candidatos conforme coluna e direção
+  const sortedCandidates = useMemo(() => {
+    if (!sortBy || displayedCandidates.length === 0) return displayedCandidates;
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    const isDateKey = (k: string) =>
+      k === 'createdAt' || k === 'updatedAt' || k.toLowerCase().includes('at') || k.toLowerCase().includes('date');
+
+    return [...displayedCandidates].sort((a, b) => {
+      let valA: string | number | undefined;
+      let valB: string | number | undefined;
+
+      if (sortBy === 'etapa') {
+        valA = getCandidateEtapa(a.id || '', answersMap);
+        valB = getCandidateEtapa(b.id || '', answersMap);
+      } else {
+        valA = a[sortBy];
+        valB = b[sortBy];
+      }
+
+      const empty = (v: string | number | undefined) =>
+        v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+      if (empty(valA) && empty(valB)) return 0;
+      if (empty(valA)) return dir;
+      if (empty(valB)) return -dir;
+
+      if (sortBy === 'etapa' || typeof valA === 'string' || typeof valB === 'string') {
+        const strA = String(valA ?? '');
+        const strB = String(valB ?? '');
+        return dir * (strA.localeCompare(strB, 'pt-BR', { sensitivity: 'base' }));
+      }
+      if (isDateKey(sortBy)) {
+        const tA = new Date(valA as string).getTime();
+        const tB = new Date(valB as string).getTime();
+        if (isNaN(tA) && isNaN(tB)) return 0;
+        if (isNaN(tA)) return dir;
+        if (isNaN(tB)) return -dir;
+        return dir * (tA - tB);
+      }
+      const numA = Number(valA);
+      const numB = Number(valB);
+      if (!Number.isNaN(numA) && !Number.isNaN(numB)) return dir * (numA - numB);
+      return dir * String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [displayedCandidates, sortBy, sortDirection, answersMap]);
+
   // Calcular paginação
-  const totalPages = Math.max(1, Math.ceil(displayedCandidates.length / ITEMS_PER_PAGE));
-  
+  const totalPages = Math.max(1, Math.ceil(sortedCandidates.length / ITEMS_PER_PAGE));
+
   // Ajustar página atual se necessário (caso a página atual seja maior que o total de páginas)
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(totalPages);
     }
   }, [totalPages, currentPage]);
-  
-  // Candidatos da página atual
+
+  // Candidatos da página atual (após ordenação)
   const paginatedCandidates = useMemo(() => {
-    if (displayedCandidates.length === 0) {
+    if (sortedCandidates.length === 0) {
       return [];
     }
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    return displayedCandidates.slice(startIndex, endIndex);
-  }, [displayedCandidates, currentPage]);
+    return sortedCandidates.slice(startIndex, endIndex);
+  }, [sortedCandidates, currentPage]);
+
+  const handleSort = (columnKey: string) => {
+    if (sortBy === columnKey) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(columnKey);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
 
   // Resetar para página 1 quando filtros mudarem
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedEtapa, selectedQuestion, selectedAnswer, selectedCandidateFilter, candidates]);
+  }, [selectedEtapa, selectedQuestion, selectedAnswer, selectedCandidateFilter, candidates, sortBy, sortDirection]);
 
   // Extrair colunas dinamicamente
   const dynamicColumns = useMemo(() => {
@@ -474,12 +531,42 @@ export const CandidatesTable = ({
         <table className="candidates-table">
           <thead>
             <tr>
-              {/* Renderizar colunas dinamicamente */}
-              {orderedColumns.map((col) => (
-                <th key={col.key}>{col.label}</th>
-              ))}
-              {/* Coluna especial "Etapa" */}
-              <th>Etapa</th>
+              {/* Renderizar colunas dinamicamente (ordenáveis) */}
+              {orderedColumns.map((col) => {
+                const isSorted = sortBy === col.key;
+                return (
+                  <th
+                    key={col.key}
+                    className="sortable-th"
+                    onClick={() => handleSort(col.key)}
+                    title={`Ordenar por ${col.label} (${isSorted && sortDirection === 'asc' ? 'clique para descrescente' : 'clique para crescente'})`}
+                  >
+                    <span className="th-content">
+                      {col.label}
+                      {isSorted && (
+                        <span className="sort-indicator" aria-hidden>
+                          {sortDirection === 'asc' ? ' ▲' : ' ▼'}
+                        </span>
+                      )}
+                    </span>
+                  </th>
+                );
+              })}
+              {/* Coluna especial "Etapa" (ordenável) */}
+              <th
+                className="sortable-th"
+                onClick={() => handleSort('etapa')}
+                title={`Ordenar por Etapa (${sortBy === 'etapa' && sortDirection === 'asc' ? 'clique para descrescente' : 'clique para crescente'})`}
+              >
+                <span className="th-content">
+                  Etapa
+                  {sortBy === 'etapa' && (
+                    <span className="sort-indicator" aria-hidden>
+                      {sortDirection === 'asc' ? ' ▲' : ' ▼'}
+                    </span>
+                  )}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>

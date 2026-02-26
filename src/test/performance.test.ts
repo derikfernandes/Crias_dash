@@ -106,8 +106,8 @@ describe('Performance Tests - 10.000 Alunos', () => {
         const count = etapasCount.get('Sem respostas') || 0;
         etapasCount.set('Sem respostas', count + 1);
       } else {
-        const hasQuestion65 = answers.some((a) => a.question === 65);
-        const etapa = hasQuestion65 ? 'Finalizou' : 'Em progresso';
+        const hasQuestion66 = answers.some((a) => a.question === 66);
+        const etapa = hasQuestion66 ? 'Finalizou' : 'Em progresso';
         const count = etapasCount.get(etapa) || 0;
         etapasCount.set(etapa, count + 1);
       }

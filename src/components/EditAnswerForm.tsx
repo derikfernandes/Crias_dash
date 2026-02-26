@@ -63,8 +63,8 @@ export const EditAnswerForm = ({
 
     const questions: Array<{ number: number; text: string; etapa: string }> = [];
     
-    // Gerar todas as questões de 0 a 65
-    for (let i = 0; i <= 65; i++) {
+    // Gerar todas as questões de 1 a 66
+    for (let i = 1; i <= 66; i++) {
       const etapa = getEtapa(i);
       if (etapa === selectedEtapa) {
         questions.push({

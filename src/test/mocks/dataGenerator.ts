@@ -51,18 +51,18 @@ function generateDate(daysAgo: number = 0): string {
 
 function generateAnswers(candidateId: string, maxQuestions: number = 66): Answer[] {
   const answers: Answer[] = [];
-  const numAnswers = Math.floor(Math.random() * maxQuestions) + 1;
+  const numAnswers = Math.min(Math.floor(Math.random() * maxQuestions) + 1, maxQuestions);
   
-  for (let i = 0; i < numAnswers; i++) {
+  for (let i = 1; i <= numAnswers; i++) {
     const question = i;
     let answer: string;
     
-    if (question === 0 || question === 1) {
+    if (question === 1) {
       answer = Math.random() > 0.5 ? 'Sim' : 'Não';
-    } else if (question >= 2 && question <= 24) {
+    } else if (question >= 2 && question <= 25) {
       const options = ['Opção A', 'Opção B', 'Opção C', 'Sim', 'Não'];
       answer = options[Math.floor(Math.random() * options.length)];
-    } else if (question === 65) {
+    } else if (question === 66) {
       answer = 'Finalizado';
     } else {
       answer = `Resposta ${question}`;
