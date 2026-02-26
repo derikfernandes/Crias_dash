@@ -54,9 +54,9 @@ export const AnswersChart = ({
     'Finalizou',
   ];
 
-  // Obter lista de questões disponíveis, filtradas por etapa se selecionada
+  // Obter lista de questões disponíveis (IDs 1 a 66), filtradas por etapa se selecionada
   const availableQuestions = useMemo(() => {
-    const allQuestions = Array.from({ length: 66 }, (_, i) => i).filter((q) => {
+    const allQuestions = Array.from({ length: 66 }, (_, i) => i + 1).filter((q) => {
       // Verificar se pelo menos um candidato tem resposta para esta questão
       return Array.from(answersMap.values()).some((answers) =>
         answers.some((answer) => answer.question !== undefined && answer.question === q)

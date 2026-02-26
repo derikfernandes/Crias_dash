@@ -512,20 +512,18 @@ function App() {
     }
   };
 
-  // Função auxiliar para obter etapa por questão
+  // Função auxiliar para obter etapa por questão (questões 1 a 66)
   const getEtapa = (question: number): string => {
-    if (question >= 0 && question <= 1) {
+    if (question >= 1 && question <= 1) {
       return 'Inicial';
-    } else if (question >= 2 && question <= 24) {
+    } else if (question >= 2 && question <= 25) {
       return 'Conhecendo Você';
-    } else if (question >= 25 && question <= 45) {
+    } else if (question >= 26 && question <= 46) {
       return 'Conhecendo sua Família';
-    } else if (question >= 46 && question <= 58) {
+    } else if (question >= 47 && question <= 59) {
       return 'Formulário Socioeconômico';
-    } else if (question >= 59 && question <= 64) {
+    } else if (question >= 60 && question <= 66) {
       return 'Sobre sua participação';
-    } else if (question === 65) {
-      return 'Finalizou';
     }
     return 'Desconhecida';
   };
@@ -602,6 +600,10 @@ function App() {
       filtered = filtered.filter((candidate) => {
         if (!candidate.id) return false;
         const etapa = getCandidateEtapaUtil(candidate.id, allCandidatesAnswersMap);
+        // "Não responderam nenhuma pergunta" corresponde à etapa "Sem respostas"
+        if (selectedEtapa === 'Não responderam nenhuma pergunta') {
+          return etapa === 'Sem respostas';
+        }
         return etapa === selectedEtapa;
       });
     }
@@ -1353,6 +1355,7 @@ function App() {
                   }}
                   selectedQuestion={selectedQuestion}
                   selectedAnswer={selectedAnswer}
+                  defaultQuestion={17}
                 />
               </>
             ) : (

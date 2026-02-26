@@ -21,24 +21,23 @@ export const EtapasChart = ({
   selectedEtapa,
 }: EtapasChartProps) => {
   const getEtapa = (question: number): string => {
-    if (question >= 0 && question <= 1) {
+    if (question >= 1 && question <= 1) {
       return 'Inicial';
-    } else if (question >= 2 && question <= 24) {
+    } else if (question >= 2 && question <= 25) {
       return 'Conhecendo Você';
-    } else if (question >= 25 && question <= 45) {
+    } else if (question >= 26 && question <= 46) {
       return 'Conhecendo sua Família';
-    } else if (question >= 46 && question <= 58) {
+    } else if (question >= 47 && question <= 59) {
       return 'Formulário Socioeconômico';
-    } else if (question >= 59 && question <= 64) {
+    } else if (question >= 60 && question <= 66) {
       return 'Sobre sua participação';
-    } else if (question === 65) {
-      return 'Finalizou';
     }
     return 'Desconhecida';
   };
 
   const etapasData = useMemo(() => {
     const etapas: EtapaData[] = [
+      { nome: 'Não responderam nenhuma pergunta', quantidade: 0 },
       { nome: 'Inicial', quantidade: 0 },
       { nome: 'Conhecendo Você', quantidade: 0 },
       { nome: 'Conhecendo sua Família', quantidade: 0 },
@@ -52,15 +51,17 @@ export const EtapasChart = ({
       const answers = answersMap.get(candidateId) || [];
       
       if (answers.length === 0) {
-        // Se não tem respostas, não conta em nenhuma etapa
+        // Contar em "Não responderam nenhuma pergunta" (primeira barra)
+        const semRespostas = etapas.find((e) => e.nome === 'Não responderam nenhuma pergunta');
+        if (semRespostas) semRespostas.quantidade += 1;
         return;
       }
 
-      // Verificar se tem resposta na questão 65 (Finalizou)
-      const hasQuestion65 = answers.some((answer) => answer.question === 65);
-      
-      if (hasQuestion65) {
-        // Se tem questão 65, está na etapa "Finalizou"
+      // Verificar se tem resposta na questão 66 (Finalizou)
+      const hasQuestion66 = answers.some((answer) => answer.question === 66);
+
+      if (hasQuestion66) {
+        // Se tem questão 66, está na etapa "Finalizou"
         const etapaData = etapas.find((e) => e.nome === 'Finalizou');
         if (etapaData) {
           etapaData.quantidade += 1;

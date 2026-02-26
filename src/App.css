@@ -963,6 +963,27 @@ body {
   white-space: nowrap;
 }
 
+.candidates-table th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.candidates-table th.sortable-th:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.candidates-table th .th-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.candidates-table th .sort-indicator {
+  font-size: 0.625rem;
+  opacity: 0.9;
+}
+
 .candidates-table tbody tr {
   border-bottom: 1px solid #e5e7eb;
   transition: background-color 0.15s ease;
@@ -1220,6 +1241,27 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+}
+
+.answers-table th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.answers-table th.sortable-th:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.answers-table th .th-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.answers-table th .sort-indicator {
+  font-size: 0.625rem;
+  opacity: 0.9;
 }
 
 .answers-table tbody tr {
