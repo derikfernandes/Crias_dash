@@ -132,8 +132,8 @@ export const CandidatesTable = ({
         return dir * (strA.localeCompare(strB, 'pt-BR', { sensitivity: 'base' }));
       }
       if (isDateKey(sortBy)) {
-        const tA = new Date(valA as string).getTime();
-        const tB = new Date(valB as string).getTime();
+        const tA = new Date(String(valA ?? '')).getTime();
+        const tB = new Date(String(valB ?? '')).getTime();
         if (isNaN(tA) && isNaN(tB)) return 0;
         if (isNaN(tA)) return dir;
         if (isNaN(tB)) return -dir;
