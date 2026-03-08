@@ -6,8 +6,8 @@ import { getCandidateEtapa } from '../utils/etapaUtils';
 interface InactivityChartProps {
   candidates: Candidate[];
   answersMap: Map<string, Answer[]>;
-  onInactivityClick?: (type: 'finalized' | 'notFinalized' | number | null) => void;
-  selectedInactivity?: 'finalized' | 'notFinalized' | number | null;
+  onInactivityClick?: (type: 'finalized' | 'notFinalized' | number) => void;
+  selectedInactivities?: ('finalized' | 'notFinalized' | number)[];
 }
 
 interface InactivityData {
@@ -19,8 +19,10 @@ export const InactivityChart = ({
   candidates,
   answersMap,
   onInactivityClick,
-  selectedInactivity,
+  selectedInactivities = [],
 }: InactivityChartProps) => {
+  const isSelected = (type: 'finalized' | 'notFinalized' | number) =>
+    selectedInactivities.some((s) => s === type || (typeof s === 'number' && typeof type === 'number' && s === type));
   const chartData = useMemo(() => {
     const finalized: Candidate[] = [];
     const notFinalized: Candidate[] = [];
@@ -121,8 +123,17 @@ export const InactivityChart = ({
         <span className="chart-total">Total: {candidates.length}</span>
       </div>
       <div className="chart-content">
-        {/* Barra de Finalizados */}
-        <div className="chart-bar-item">
+        {/* Barra de Finalizados - clicável para filtrar */}
+        <div
+          className={`chart-bar-item ${isSelected('finalized') ? 'selected' : ''} ${
+            chartData.finalized > 0 ? 'clickable' : ''
+          }`}
+          onClick={() => {
+            if (chartData.finalized > 0 && onInactivityClick) {
+              onInactivityClick('finalized');
+            }
+          }}
+        >
           <div className="chart-bar-label">
             <span className="chart-bar-name">✅ Finalizados</span>
             <span className="chart-bar-value">
@@ -147,8 +158,17 @@ export const InactivityChart = ({
           </div>
         </div>
 
-        {/* Barra de Não Finalizados */}
-        <div className="chart-bar-item">
+        {/* Barra de Não Finalizados - clicável para filtrar */}
+        <div
+          className={`chart-bar-item ${isSelected('notFinalized') ? 'selected' : ''} ${
+            chartData.notFinalized > 0 ? 'clickable' : ''
+          }`}
+          onClick={() => {
+            if (chartData.notFinalized > 0 && onInactivityClick) {
+              onInactivityClick('notFinalized');
+            }
+          }}
+        >
           <div className="chart-bar-label">
             <span className="chart-bar-name">⏸️ Não Finalizados</span>
             <span className="chart-bar-value">
@@ -197,16 +217,16 @@ export const InactivityChart = ({
           </div>
         ) : (
           chartData.inactivityData.map((item) => {
-            const isSelected = selectedInactivity === item.days;
+            const itemSelected = isSelected(item.days);
             return (
               <div
                 key={item.days}
-                className={`chart-bar-item ${isSelected ? 'selected' : ''} ${
+                className={`chart-bar-item ${itemSelected ? 'selected' : ''} ${
                   item.quantidade > 0 ? 'clickable' : ''
                 }`}
                 onClick={() => {
                   if (item.quantidade > 0 && onInactivityClick) {
-                    onInactivityClick(isSelected ? null : item.days);
+                    onInactivityClick(item.days);
                   }
                 }}
               >

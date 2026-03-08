@@ -1,92 +1,49 @@
-/**
- * Sistema de cache em memória para otimizar chamadas à API
- */
-
 interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  expiresAt: number;
+  value: T;
+  expiresAt: number | null;
 }
 
-class CacheManager {
-  private cache: Map<string, CacheEntry<any>> = new Map();
-  private defaultTTL: number = 5 * 60 * 1000; // 5 minutos por padrão
+const store = new Map<string, CacheEntry<unknown>>();
 
-  set<T>(key: string, data: T, ttl?: number): void {
-    const now = Date.now();
-    const expiresAt = now + (ttl || this.defaultTTL);
-    
-    this.cache.set(key, {
-      data,
-      timestamp: now,
-      expiresAt,
-    });
-  }
+function isExpired(entry: CacheEntry<unknown>): boolean {
+  if (entry.expiresAt === null) return false;
+  return Date.now() > entry.expiresAt;
+}
 
-  get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    
-    if (!entry) {
-      return null;
+export const cache = {
+  get<T>(key: string): T | undefined {
+    const entry = store.get(key) as CacheEntry<T> | undefined;
+    if (!entry) return undefined;
+    if (isExpired(entry)) {
+      store.delete(key);
+      return undefined;
     }
+    return entry.value;
+  },
 
-    const now = Date.now();
-    
-    if (now > entry.expiresAt) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return entry.data as T;
-  }
+  set<T>(key: string, value: T, ttlMs?: number): void {
+    const expiresAt = ttlMs != null ? Date.now() + ttlMs : null;
+    store.set(key, { value, expiresAt });
+  },
 
   has(key: string): boolean {
-    const entry = this.cache.get(key);
-    
-    if (!entry) {
+    const entry = store.get(key);
+    if (!entry) return false;
+    if (isExpired(entry)) {
+      store.delete(key);
       return false;
     }
-
-    const now = Date.now();
-    
-    if (now > entry.expiresAt) {
-      this.cache.delete(key);
-      return false;
-    }
-
     return true;
-  }
+  },
 
   delete(key: string): void {
-    this.cache.delete(key);
-  }
+    store.delete(key);
+  },
 
   clear(): void {
-    this.cache.clear();
-  }
-
-  cleanup(): void {
-    const now = Date.now();
-    const keysToDelete: string[] = [];
-
-    this.cache.forEach((entry, key) => {
-      if (now > entry.expiresAt) {
-        keysToDelete.push(key);
-      }
-    });
-
-    keysToDelete.forEach((key) => this.cache.delete(key));
-  }
-}
-
-export const cache = new CacheManager();
-
-// Limpar cache expirado a cada minuto
-if (typeof window !== 'undefined') {
-  setInterval(() => {
-    cache.cleanup();
-  }, 60 * 1000);
-}
+    store.clear();
+  },
+};
 
 export function getAnswersCacheKey(institutionId: string, candidateId: string): string {
   return `answers:${institutionId}:${candidateId}`;
@@ -95,8 +52,3 @@ export function getAnswersCacheKey(institutionId: string, candidateId: string): 
 export function getCandidatesCacheKey(institutionId: string): string {
   return `candidates:${institutionId}`;
 }
-
-export function getInstitutionsCacheKey(): string {
-  return 'institutions:all';
-}
-

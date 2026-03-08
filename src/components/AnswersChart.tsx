@@ -9,8 +9,7 @@ interface AnswersChartProps {
   candidates: Candidate[];
   answersMap: Map<string, Answer[]>;
   onAnswerClick?: (question: number | null, answer: string | null) => void;
-  selectedQuestion?: number | null;
-  selectedAnswer?: string | null;
+  selectedAnswerFilters?: { question: number; answer: string }[];
   defaultQuestion?: number;
 }
 
@@ -24,8 +23,7 @@ export const AnswersChart = ({
   candidates,
   answersMap,
   onAnswerClick,
-  selectedQuestion,
-  selectedAnswer,
+  selectedAnswerFilters = [],
   defaultQuestion,
 }: AnswersChartProps) => {
   const [localSelectedQuestion, setLocalSelectedQuestion] = useState<
@@ -41,8 +39,7 @@ export const AnswersChart = ({
   const etapaInputRef = useRef<HTMLInputElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
 
-  // Usar selectedQuestion do prop se fornecido, senão usar estado local
-  const currentQuestion = selectedQuestion ?? localSelectedQuestion;
+  const currentQuestion = localSelectedQuestion;
 
   // Lista de etapas disponíveis
   const etapas = [
@@ -251,11 +248,7 @@ export const AnswersChart = ({
 
   const handleAnswerClick = (answerValue: string) => {
     if (onAnswerClick && currentQuestion !== null) {
-      const isSelected = selectedAnswer === answerValue;
-      onAnswerClick(
-        isSelected ? null : currentQuestion,
-        isSelected ? null : answerValue
-      );
+      onAnswerClick(currentQuestion, answerValue);
     }
   };
 
@@ -469,9 +462,9 @@ export const AnswersChart = ({
           </div>
           <div className="chart-content">
             {chartData.data.map((item) => {
-              const isSelected =
-                selectedQuestion === currentQuestion &&
-                selectedAnswer === item.value;
+              const isSelected = selectedAnswerFilters.some(
+                (f) => f.question === currentQuestion && f.answer === item.value
+              );
               return (
                 <div
                   key={item.value}
