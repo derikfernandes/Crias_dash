@@ -15,11 +15,12 @@ interface CandidatesTableProps {
   selectedCandidateId: string | null;
   onExport?: (format: 'csv' | 'xlsx') => void;
   isExporting?: boolean;
+  onExportCompiled?: (format: 'csv' | 'xlsx') => void;
+  isExportingCompiled?: boolean;
   answersMap: Map<string, Answer[]>;
-  selectedEtapa?: string | null;
-  selectedQuestion?: number | null;
-  selectedAnswer?: string | null;
-  selectedInactivity?: 'finalized' | 'notFinalized' | number | null;
+  selectedEtapas?: string[];
+  selectedAnswerFilters?: { question: number; answer: string }[];
+  selectedInactivities?: ('finalized' | 'notFinalized' | number)[];
   onClearFilter?: () => void;
   totalCandidates?: number;
 }
@@ -34,14 +35,16 @@ export const CandidatesTable = ({
   selectedCandidateId,
   onExport,
   isExporting,
+  onExportCompiled,
+  isExportingCompiled,
   answersMap,
-  selectedEtapa,
-  selectedQuestion,
-  selectedAnswer,
-  selectedInactivity,
+  selectedEtapas = [],
+  selectedAnswerFilters = [],
+  selectedInactivities = [],
   onClearFilter,
   totalCandidates,
 }: CandidatesTableProps) => {
+  const hasChartFilters = selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0;
   const [isCandidateFilterOpen, setIsCandidateFilterOpen] = useState(false);
   const [searchTermCandidate, setSearchTermCandidate] = useState('');
   const [selectedCandidateFilter, setSelectedCandidateFilter] = useState<Candidate | null>(null);
@@ -179,7 +182,7 @@ export const CandidatesTable = ({
   // Resetar para página 1 quando filtros mudarem
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedEtapa, selectedQuestion, selectedAnswer, selectedCandidateFilter, candidates, sortBy, sortDirection]);
+  }, [selectedEtapas, selectedAnswerFilters, selectedInactivities, selectedCandidateFilter, candidates, sortBy, sortDirection]);
 
   // Extrair colunas dinamicamente
   const dynamicColumns = useMemo(() => {
@@ -222,7 +225,9 @@ export const CandidatesTable = ({
     return [...known, ...unknown];
   }, [dynamicColumns]);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showCompiledExportMenu, setShowCompiledExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const compiledExportMenuRef = useRef<HTMLDivElement>(null);
 
   // Fechar dropdown do filtro ao clicar fora
   useEffect(() => {
@@ -298,11 +303,34 @@ export const CandidatesTable = ({
     }
   }, [showExportMenu]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        compiledExportMenuRef.current &&
+        !compiledExportMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowCompiledExportMenu(false);
+      }
+    };
+
+    if (showCompiledExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showCompiledExportMenu]);
+
   const handleExportClick = (format: 'csv' | 'xlsx') => {
     if (onExport) {
       onExport(format);
     }
     setShowExportMenu(false);
+  };
+
+  const handleExportCompiledClick = (format: 'csv' | 'xlsx') => {
+    if (onExportCompiled) {
+      onExportCompiled(format);
+    }
+    setShowCompiledExportMenu(false);
   };
 
   // formatDate removido - não está sendo usado
@@ -347,9 +375,9 @@ export const CandidatesTable = ({
         <div className="candidates-title-container">
           <h2 className="candidates-title">
             Candidatos
-            {selectedEtapa && (
+            {selectedEtapas.length > 0 && (
               <span className="filter-badge">
-                Filtrado: {selectedEtapa}
+                Etapa: {selectedEtapas.join(', ')}
                 {totalCandidates !== undefined && (
                   <span className="filter-count">
                     ({displayedCandidates.length} de {totalCandidates})
@@ -357,11 +385,21 @@ export const CandidatesTable = ({
                 )}
               </span>
             )}
-            {selectedQuestion !== null && selectedQuestion !== undefined && selectedAnswer && (
+            {selectedAnswerFilters.length > 0 && (
               <span className="filter-badge">
-                Filtrado: Q{selectedQuestion} = {getFormattedAnswer(selectedQuestion, selectedAnswer) !== selectedAnswer 
-                  ? getFormattedAnswer(selectedQuestion, selectedAnswer)
-                  : selectedAnswer}
+                Resposta: {selectedAnswerFilters.map((f) => `Q${f.question}=${getFormattedAnswer(f.question, f.answer) !== f.answer ? getFormattedAnswer(f.question, f.answer) : f.answer}`).join('; ')}
+                {totalCandidates !== undefined && (
+                  <span className="filter-count">
+                    ({displayedCandidates.length} de {totalCandidates})
+                  </span>
+                )}
+              </span>
+            )}
+            {selectedInactivities.length > 0 && (
+              <span className="filter-badge">
+                Inatividade: {selectedInactivities.map((s) =>
+                  s === 'finalized' ? 'Finalizados' : s === 'notFinalized' ? 'Não finalizados' : `${s} ${s === 1 ? 'dia' : 'dias'}`
+                ).join(', ')}
                 {totalCandidates !== undefined && (
                   <span className="filter-count">
                     ({displayedCandidates.length} de {totalCandidates})
@@ -461,7 +499,7 @@ export const CandidatesTable = ({
               ✕
             </button>
           )}
-          {(selectedEtapa || (selectedQuestion !== null && selectedAnswer) || selectedInactivity !== null || selectedCandidateFilter) && onClearFilter && (
+          {(hasChartFilters || selectedCandidateFilter) && onClearFilter && (
             <button
               onClick={() => {
                 if (onClearFilter) {
@@ -476,47 +514,96 @@ export const CandidatesTable = ({
             </button>
           )}
         </div>
-        {candidates.length > 0 && onExport && (
-          <div className="export-container" ref={exportMenuRef}>
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              disabled={isExporting}
-              className={`export-button ${showExportMenu ? 'open' : ''}`}
-            >
-              {isExporting ? 'Exportando...' : 'Exportar dados'}
-              <svg
-                className="export-arrow"
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M2 4L6 8L10 4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {showExportMenu && (
-              <div className="export-menu">
+        {candidates.length > 0 && (onExport || onExportCompiled) && (
+          <div className="export-buttons-row">
+            {onExport && (
+              <div className="export-container" ref={exportMenuRef}>
                 <button
-                  onClick={() => handleExportClick('csv')}
-                  className="export-menu-item"
+                  onClick={() => setShowExportMenu(!showExportMenu)}
                   disabled={isExporting}
+                  className={`export-button ${showExportMenu ? 'open' : ''}`}
                 >
-                  Exportar como CSV
+                  {isExporting ? 'Exportando...' : 'Exportar dados'}
+                  <svg
+                    className="export-arrow"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M2 4L6 8L10 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
+                {showExportMenu && (
+                  <div className="export-menu">
+                    <button
+                      onClick={() => handleExportClick('csv')}
+                      className="export-menu-item"
+                      disabled={isExporting}
+                    >
+                      Exportar como CSV
+                    </button>
+                    <button
+                      onClick={() => handleExportClick('xlsx')}
+                      className="export-menu-item"
+                      disabled={isExporting}
+                    >
+                      Exportar como XLSX
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {onExportCompiled && (
+              <div className="export-container" ref={compiledExportMenuRef}>
                 <button
-                  onClick={() => handleExportClick('xlsx')}
-                  className="export-menu-item"
-                  disabled={isExporting}
+                  onClick={() => setShowCompiledExportMenu(!showCompiledExportMenu)}
+                  disabled={isExportingCompiled}
+                  className={`export-button ${showCompiledExportMenu ? 'open' : ''}`}
                 >
-                  Exportar como XLSX
+                  {isExportingCompiled ? 'Exportando...' : 'Extrair dados compilados'}
+                  <svg
+                    className="export-arrow"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M2 4L6 8L10 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
+                {showCompiledExportMenu && (
+                  <div className="export-menu">
+                    <button
+                      onClick={() => handleExportCompiledClick('csv')}
+                      className="export-menu-item"
+                      disabled={isExportingCompiled}
+                    >
+                      Baixar CSV
+                    </button>
+                    <button
+                      onClick={() => handleExportCompiledClick('xlsx')}
+                      className="export-menu-item"
+                      disabled={isExportingCompiled}
+                    >
+                      Baixar XLSX
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

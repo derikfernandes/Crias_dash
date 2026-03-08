@@ -10,6 +10,7 @@ import { EtapasChart } from './components/EtapasChart';
 import { AnswersChart } from './components/AnswersChart';
 import { InactivityChart } from './components/InactivityChart';
 import { NavigationHeader } from './components/NavigationHeader';
+import { LoadingOverlay } from './components/LoadingOverlay';
 import { Gerenciamento } from './pages/Gerenciamento';
 import { Login } from './pages/Login';
 import { Graficos } from './pages/Graficos';
@@ -39,21 +40,31 @@ function App() {
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingCompiled, setIsExportingCompiled] = useState(false);
   const [isExportingCandidate, setIsExportingCandidate] = useState(false);
-  const [selectedEtapa, setSelectedEtapa] = useState<string | null>(null);
-  const [selectedQuestion, setSelectedQuestion] = useState<number | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [selectedInactivity, setSelectedInactivity] = useState<'finalized' | 'notFinalized' | number | null>(null);
+  const [selectedEtapas, setSelectedEtapas] = useState<string[]>([]);
+  const [selectedAnswerFilters, setSelectedAnswerFilters] = useState<{ question: number; answer: string }[]>([]);
+  const [selectedInactivities, setSelectedInactivities] = useState<('finalized' | 'notFinalized' | number)[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
   const [answersError, setAnswersError] = useState<string | null>(null);
   const [lastUpdateDate, setLastUpdateDate] = useState<Date | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingPhase, setLoadingPhase] = useState('Instituições');
+  const [initialAnswersLoadComplete, setInitialAnswersLoadComplete] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const abortControllerAnswersRef = useRef<AbortController | null>(null);
+
+  const isInitialDataReady =
+    !!selectedInstitution &&
+    !isLoadingCandidates &&
+    (candidates.length === 0 || initialAnswersLoadComplete);
 
   const fetchInstitutions = async () => {
     setIsLoading(true);
     setError(null);
+    setLoadingProgress(0);
+    setLoadingPhase('Instituições');
 
     try {
       const response = await fetch(
@@ -110,6 +121,8 @@ function App() {
       );
     } finally {
       setIsLoading(false);
+      setLoadingProgress(15);
+      setLoadingPhase('Candidatos');
     }
   };
 
@@ -126,6 +139,8 @@ function App() {
     setIsLoadingCandidates(true);
     setCandidatesError(null);
     setCandidates([]);
+    setLoadingProgress(15);
+    setLoadingPhase('Candidatos');
 
     try {
       // Verificar cache primeiro
@@ -135,6 +150,8 @@ function App() {
       if (cached) {
         setCandidates(cached);
         setIsLoadingCandidates(false);
+        setLoadingProgress(40);
+        setLoadingPhase('Respostas');
         return;
       }
 
@@ -168,6 +185,8 @@ function App() {
       );
     } finally {
       setIsLoadingCandidates(false);
+      setLoadingProgress(40);
+      setLoadingPhase('Respostas');
     }
   };
 
@@ -201,10 +220,9 @@ function App() {
       setAnswers([]);
       setAllCandidatesAnswersMap(new Map());
       setSelectedInstitution(null);
-      setSelectedEtapa(null);
-      setSelectedQuestion(null);
-      setSelectedAnswer(null);
-      setSelectedInactivity(null);
+      setSelectedEtapas([]);
+      setSelectedAnswerFilters([]);
+      setSelectedInactivities([]);
       setError(null);
       setCandidatesError(null);
       setAnswersError(null);
@@ -279,24 +297,33 @@ function App() {
       setSelectedCandidate(null);
       setAnswers([]);
       setAnswersError(null);
-      setSelectedEtapa(null);
+      setSelectedEtapas([]);
+      setSelectedAnswerFilters([]);
+      setSelectedInactivities([]);
       return;
     }
 
     if (selectedInstitution && selectedInstitution.id) {
+      setLoadingProgress(15);
+      setInitialAnswersLoadComplete(false);
+      setLoadingPhase('Candidatos');
       fetchCandidates(selectedInstitution.id);
       // Limpar candidato selecionado e respostas ao trocar instituição
       setSelectedCandidate(null);
       setAnswers([]);
       setAnswersError(null);
-      setSelectedEtapa(null);
+      setSelectedEtapas([]);
+      setSelectedAnswerFilters([]);
+      setSelectedInactivities([]);
     } else {
       setCandidates([]);
       setCandidatesError(null);
       setSelectedCandidate(null);
       setAnswers([]);
       setAnswersError(null);
-      setSelectedEtapa(null);
+      setSelectedEtapas([]);
+      setSelectedAnswerFilters([]);
+      setSelectedInactivities([]);
     }
 
     // Cleanup: cancelar requisição ao desmontar ou trocar instituição
@@ -337,7 +364,6 @@ function App() {
 
   // Buscar respostas de todos os candidatos para o gráfico (otimizado)
   useEffect(() => {
-    // Só buscar respostas se estiver autenticado
     if (!isAuthenticated) {
       setAllCandidatesAnswersMap(new Map());
       return;
@@ -348,23 +374,35 @@ function App() {
       selectedInstitution.id &&
       candidates.length > 0
     ) {
-      // Para muitos candidatos, carregar apenas uma amostra inicial
-      // O resto será carregado sob demanda quando necessário
-      const maxInitialLoad = 200; // Carregar apenas 200 inicialmente
-      const candidatesToLoad = candidates.slice(0, maxInitialLoad);
-      
-      fetchAllAnswers(selectedInstitution.id, candidatesToLoad).then((answersMap) => {
+      setInitialAnswersLoadComplete(false);
+      setLoadingProgress(40);
+      setLoadingPhase('Verificando e classificando todos os candidatos');
+
+      fetchAllAnswers(
+        selectedInstitution.id,
+        candidates,
+        (completed, total) => {
+          if (total > 0) {
+            setLoadingProgress(40 + 60 * (completed / total));
+          }
+        }
+      ).then((answersMap) => {
         setAllCandidatesAnswersMap((prev) => {
-          // Mesclar com dados anteriores (caso já tenha alguns carregados)
           const merged = new Map(prev);
           answersMap.forEach((answers, candidateId) => {
             merged.set(candidateId, answers);
           });
           return merged;
         });
+        setLoadingProgress(100);
+        setInitialAnswersLoadComplete(true);
       });
     } else {
       setAllCandidatesAnswersMap(new Map());
+      if (selectedInstitution && selectedInstitution.id && candidates.length === 0) {
+        setLoadingProgress(100);
+        setInitialAnswersLoadComplete(true);
+      }
     }
   }, [selectedInstitution?.id, candidates.length, isAuthenticated]);
 
@@ -399,28 +437,26 @@ function App() {
 
   // Função para atualizar tudo: instituições, candidatos e respostas
   const handleRefreshAll = async () => {
-    // Atualizar instituições
+    setInitialAnswersLoadComplete(false);
+    setLoadingProgress(0);
+    setLoadingPhase('Instituições');
+
     await fetchInstitutions();
-    
-    // Se houver instituição selecionada, atualizar candidatos
+
     if (selectedInstitution && selectedInstitution.id) {
-      // LIMPAR CACHE DE RESPOSTAS desta instituição antes de atualizar
-      // Isso força uma nova busca de todas as respostas
       const institutionId = selectedInstitution.id;
-      
-      // Limpar cache de respostas de todos os candidatos desta instituição
-      // Percorrer todos os candidatos atuais e limpar seus caches
+
       candidates.forEach((candidate) => {
         if (candidate.id) {
           const answersCacheKey = getAnswersCacheKey(institutionId, candidate.id);
           cache.delete(answersCacheKey);
         }
       });
-      
-      // Limpar o mapa de respostas para forçar recarregamento
+
       setAllCandidatesAnswersMap(new Map());
-      
-      // Buscar candidatos diretamente para ter os dados atualizados
+      setLoadingProgress(15);
+      setLoadingPhase('Candidatos');
+
       try {
         const response = await fetch(
           `https://criasapi.geocode.com.br/institution/${selectedInstitution.id}/candidate/`,
@@ -431,27 +467,33 @@ function App() {
 
         if (response.ok) {
           const updatedCandidates: Candidate[] = await response.json();
-          
-          // Atualizar cache de candidatos
+
           const cacheKey = getCandidatesCacheKey(selectedInstitution.id);
           cache.set(cacheKey, updatedCandidates, 5 * 60 * 1000);
-          
+
           setCandidates(updatedCandidates);
           setCandidatesError(null);
-          
-          // ATUALIZAR TODAS AS RESPOSTAS DE TODOS OS CANDIDATOS (não apenas 200)
-          // Isso garante que os gráficos mostrem dados atualizados
+
           if (updatedCandidates.length > 0) {
-            // Limpar cache de respostas dos novos candidatos também
             updatedCandidates.forEach((candidate) => {
               if (candidate.id && selectedInstitution.id) {
                 const answersCacheKey = getAnswersCacheKey(selectedInstitution.id, candidate.id);
                 cache.delete(answersCacheKey);
               }
             });
-            
-            // Buscar TODAS as respostas de TODOS os candidatos (sem limite)
-            const updatedAnswersMap = await fetchAllAnswers(selectedInstitution.id, updatedCandidates);
+
+            setLoadingProgress(40);
+            setLoadingPhase('Verificando e classificando todos os candidatos');
+
+            const updatedAnswersMap = await fetchAllAnswers(
+              selectedInstitution.id,
+              updatedCandidates,
+              (completed, total) => {
+                if (total > 0) {
+                  setLoadingProgress(40 + 60 * (completed / total));
+                }
+              }
+            );
             setAllCandidatesAnswersMap(updatedAnswersMap);
           } else {
             setAllCandidatesAnswersMap(new Map());
@@ -463,18 +505,21 @@ function App() {
             ? err.message
             : 'Ocorreu um erro ao carregar os candidatos'
         );
+      } finally {
+        setLoadingProgress(100);
+        setInitialAnswersLoadComplete(true);
       }
-      
-      // Se houver candidato selecionado, atualizar suas respostas
+
       if (selectedCandidate && selectedCandidate.id) {
-        // Limpar cache da resposta deste candidato também
         const answersCacheKey = getAnswersCacheKey(selectedInstitution.id, selectedCandidate.id);
         cache.delete(answersCacheKey);
         await fetchAnswers(selectedInstitution.id, selectedCandidate.id);
       }
+    } else {
+      setLoadingProgress(100);
+      setInitialAnswersLoadComplete(true);
     }
-    
-    // Atualizar data da última atualização
+
     setLastUpdateDate(new Date());
   };
 
@@ -492,10 +537,9 @@ function App() {
     setAnswers([]);
     setAllCandidatesAnswersMap(new Map());
     setSelectedInstitution(null);
-    setSelectedEtapa(null);
-    setSelectedQuestion(null);
-    setSelectedAnswer(null);
-    setSelectedInactivity(null);
+    setSelectedEtapas([]);
+    setSelectedAnswerFilters([]);
+    setSelectedInactivities([]);
     setError(null);
     setCandidatesError(null);
     setAnswersError(null);
@@ -529,12 +573,12 @@ function App() {
   };
 
 
-  // Filtrar candidatos por etapa, resposta ou inatividade
+  // Filtrar candidatos: OR dentro de cada tipo, AND entre tipos
   const filteredCandidates = useMemo(() => {
     let filtered = candidates;
 
-    // Filtro por inatividade (tem prioridade sobre etapa e resposta)
-    if (selectedInactivity !== null) {
+    // Filtro por inatividade (qualquer um selecionado = candidato deve bater em pelo menos um)
+    if (selectedInactivities.length > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -543,97 +587,87 @@ function App() {
         const etapa = getCandidateEtapaUtil(candidate.id, allCandidatesAnswersMap);
         const isFinalized = etapa === 'Finalizou';
 
-        if (selectedInactivity === 'finalized') {
-          return isFinalized;
-        } else if (selectedInactivity === 'notFinalized') {
-          return !isFinalized;
-        } else if (typeof selectedInactivity === 'number') {
-          // Filtrar por dias específicos de inatividade
-          if (isFinalized) return false;
-          
-          const answers = allCandidatesAnswersMap.get(candidate.id) || [];
-          let daysOfInactivity = 0;
-
-          if (answers.length === 0) {
-            if (candidate.createdAt) {
-              try {
-                const createdDate = new Date(candidate.createdAt);
-                createdDate.setHours(0, 0, 0, 0);
-                const daysDiff = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-                daysOfInactivity = Math.max(0, daysDiff);
-              } catch (e) {
-                return false;
-              }
-            }
-          } else {
-            let lastAnswerDate: Date | null = null;
-            answers.forEach((answer) => {
-              if (answer.answeredAt) {
+        return selectedInactivities.some((sel) => {
+          if (sel === 'finalized') return isFinalized;
+          if (sel === 'notFinalized') return !isFinalized;
+          if (typeof sel === 'number') {
+            if (isFinalized) return false;
+            const cid = candidate.id as string;
+            const answers = allCandidatesAnswersMap.get(cid) || [];
+            let daysOfInactivity = 0;
+            if (answers.length === 0) {
+              if (candidate.createdAt) {
                 try {
-                  const answerDate = new Date(answer.answeredAt);
-                  if (!lastAnswerDate || answerDate > lastAnswerDate) {
-                    lastAnswerDate = answerDate;
-                  }
+                  const createdDate = new Date(candidate.createdAt);
+                  createdDate.setHours(0, 0, 0, 0);
+                  daysOfInactivity = Math.max(0, Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
                 } catch (e) {
-                  // Ignorar
+                  return false;
                 }
               }
-            });
-
-            if (lastAnswerDate) {
-              const lastDate = new Date(lastAnswerDate);
-              lastDate.setHours(0, 0, 0, 0);
-              const daysDiff = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-              daysOfInactivity = Math.max(0, daysDiff);
+            } else {
+              let lastAnswerDate: Date | null = null;
+              answers.forEach((answer) => {
+                if (answer.answeredAt) {
+                  try {
+                    const answerDate = new Date(answer.answeredAt);
+                    if (!lastAnswerDate || answerDate > lastAnswerDate) lastAnswerDate = answerDate;
+                  } catch (e) {}
+                }
+              });
+              if (lastAnswerDate) {
+                const lastDate = new Date(lastAnswerDate);
+                lastDate.setHours(0, 0, 0, 0);
+                daysOfInactivity = Math.max(0, Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)));
+              }
             }
+            return daysOfInactivity === sel;
           }
-
-          return daysOfInactivity === selectedInactivity;
-        }
-
-        return true;
+          return false;
+        });
       });
     }
 
-    // Filtro por etapa
-    if (selectedEtapa) {
+    // Filtro por etapa (OR)
+    if (selectedEtapas.length > 0) {
       filtered = filtered.filter((candidate) => {
         if (!candidate.id) return false;
         const etapa = getCandidateEtapaUtil(candidate.id, allCandidatesAnswersMap);
-        // "Não responderam nenhuma pergunta" corresponde à etapa "Sem respostas"
-        if (selectedEtapa === 'Não responderam nenhuma pergunta') {
-          return etapa === 'Sem respostas';
-        }
-        return etapa === selectedEtapa;
+        return selectedEtapas.some((selectedEtapa) => {
+          if (selectedEtapa === 'Não responderam nenhuma pergunta') return etapa === 'Sem respostas';
+          return etapa === selectedEtapa;
+        });
       });
     }
 
-    // Filtro por resposta
-    if (selectedQuestion !== null && selectedAnswer !== null) {
+    // Filtro por resposta (OR: candidato deve ter pelo menos uma das respostas selecionadas)
+    if (selectedAnswerFilters.length > 0) {
       filtered = filtered.filter((candidate) => {
         if (!candidate.id) return false;
         const answers = allCandidatesAnswersMap.get(candidate.id) || [];
-        const answer = answers.find(
-          (a) => a.question !== undefined && a.question === selectedQuestion && a.answer === selectedAnswer
+        return selectedAnswerFilters.some(
+          (f) => !!answers.find((a) => a.question !== undefined && a.question === f.question && a.answer === f.answer)
         );
-        return !!answer;
       });
     }
 
     return filtered;
-  }, [candidates, selectedEtapa, selectedQuestion, selectedAnswer, selectedInactivity, allCandidatesAnswersMap]);
+  }, [candidates, selectedEtapas, selectedAnswerFilters, selectedInactivities, allCandidatesAnswersMap]);
 
   // Função para buscar todas as respostas de todos os candidatos (otimizada)
   const fetchAllAnswers = async (
     institutionId: string,
-    candidates: Candidate[]
+    candidates: Candidate[],
+    onProgress?: (completed: number, total: number) => void
   ): Promise<Map<string, Answer[]>> => {
     const answersMap = new Map<string, Answer[]>();
     
     // Filtrar candidatos com ID
     const candidatesWithId = candidates.filter((c) => c.id);
+    const total = candidatesWithId.length;
     
-    if (candidatesWithId.length === 0) {
+    if (total === 0) {
+      onProgress?.(0, 0);
       return answersMap;
     }
 
@@ -647,20 +681,19 @@ function App() {
       const cached = cache.get<Answer[]>(cacheKey);
       
       if (cached) {
-        // Usar dados do cache
         answersMap.set(candidate.id, cached);
       } else {
-        // Adicionar à lista de candidatos para buscar
         candidatesToFetch.push(candidate);
       }
     });
 
-    // Se todos já estão no cache, retornar imediatamente
+    const cachedCount = total - candidatesToFetch.length;
+    onProgress?.(cachedCount, total);
+
     if (candidatesToFetch.length === 0) {
       return answersMap;
     }
 
-    // Processar em lotes para evitar sobrecarga
     await processInBatches(
       candidatesToFetch,
       async (candidate) => {
@@ -674,11 +707,8 @@ function App() {
           
           if (response.ok && candidate.id) {
             const answers: Answer[] = await response.json();
-            
-            // Armazenar no cache
             const cacheKey = getAnswersCacheKey(institutionId, candidate.id);
-            cache.set(cacheKey, answers, 5 * 60 * 1000); // Cache por 5 minutos
-            
+            cache.set(cacheKey, answers, 5 * 60 * 1000);
             answersMap.set(candidate.id, answers);
           }
         } catch (err) {
@@ -689,8 +719,11 @@ function App() {
         }
       },
       {
-        maxConcurrent: 10, // Máximo 10 requisições simultâneas
-        delayBetweenBatches: 50, // 50ms entre lotes
+        maxConcurrent: 10,
+        delayBetweenBatches: 50,
+        onProgress: (batchCompleted) => {
+          onProgress?.(cachedCount + batchCompleted, total);
+        },
       }
     );
 
@@ -707,6 +740,134 @@ function App() {
       return `"${str.replace(/"/g, '""')}"`;
     }
     return str;
+  };
+
+  const formatDateForExport = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  // Dados compilados: um aluno por linha (cadastrais + etapa + questão parou + dias última mensagem)
+  const generateCompiledData = (
+    candidates: Candidate[],
+    answersMap: Map<string, Answer[]>
+  ): string[][] => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const headers = [
+      'Nome',
+      'Telefone',
+      'E-mail',
+      'Documento',
+      'Endereço',
+      'Cidade',
+      'Criado em',
+      'Atualizado em',
+      'ID',
+      'Etapa',
+      'Questão parou',
+      'Dias da última mensagem',
+    ];
+
+    const rows: string[][] = [headers];
+
+    candidates.forEach((candidate) => {
+      const cid = candidate.id || '';
+      const answers = answersMap.get(cid) || [];
+      const etapa = getCandidateEtapaUtil(cid, answersMap);
+
+      let questaoParou = '';
+      let lastDate: Date | null = null;
+
+      if (answers.length > 0) {
+        let maxQuestion = -1;
+        answers.forEach((a) => {
+          if (a.question !== undefined && a.question > maxQuestion) {
+            maxQuestion = a.question;
+          }
+          if (a.answeredAt) {
+            try {
+              const d = new Date(a.answeredAt);
+              if (!isNaN(d.getTime()) && (!lastDate || d > lastDate)) lastDate = d;
+            } catch {}
+          }
+        });
+        if (maxQuestion >= 0) questaoParou = String(maxQuestion);
+      }
+
+      if (!lastDate && candidate.createdAt) {
+        try {
+          const d = new Date(candidate.createdAt);
+          if (!isNaN(d.getTime())) lastDate = d;
+        } catch {}
+      }
+
+      let diasUltimaMensagem = '';
+      if (lastDate) {
+        const last = new Date(lastDate);
+        last.setHours(0, 0, 0, 0);
+        const days = Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+        diasUltimaMensagem = String(Math.max(0, days));
+      }
+
+      rows.push([
+        candidate.name || '',
+        candidate.whatsapp || '',
+        candidate.email || '',
+        candidate.document || '',
+        candidate.addressLine1 || '',
+        candidate.city || '',
+        formatDateForExport(candidate.createdAt),
+        formatDateForExport(candidate.updatedAt),
+        cid,
+        etapa,
+        questaoParou,
+        diasUltimaMensagem,
+      ]);
+    });
+
+    return rows;
+  };
+
+  const generateCompiledCSV = (
+    candidates: Candidate[],
+    answersMap: Map<string, Answer[]>
+  ): string => {
+    const data = generateCompiledData(candidates, answersMap);
+    return data.map((row) => row.map(escapeCSV).join(',')).join('\n');
+  };
+
+  const downloadCompiledXLSX = (
+    candidates: Candidate[],
+    answersMap: Map<string, Answer[]>,
+    institutionName: string
+  ) => {
+    const data = generateCompiledData(candidates, answersMap);
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const colWidths = [
+      { wch: 25 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 35 },
+      { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 28 },
+      { wch: 14 }, { wch: 22 },
+    ];
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados compilados');
+    const sanitized = (institutionName || 'inst').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `candidatos_compilados_${sanitized}_${date}.xlsx`);
   };
 
   // Função para gerar CSV
@@ -1171,6 +1332,37 @@ function App() {
     XLSX.writeFile(wb, filename);
   };
 
+  // Handler de exportação "dados compilados" (um candidato por linha)
+  const handleExportCompiled = (format: 'csv' | 'xlsx') => {
+    if (!selectedInstitution || filteredCandidates.length === 0) return;
+    setIsExportingCompiled(true);
+    try {
+      if (format === 'csv') {
+        const csvContent = generateCompiledCSV(filteredCandidates, allCandidatesAnswersMap);
+        const sanitized = (selectedInstitution.name || '')
+          .replace(/[^a-z0-9]/gi, '_')
+          .toLowerCase();
+        const filterSuffix =
+          selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0
+            ? '_filtro'
+            : '';
+        const date = new Date().toISOString().split('T')[0];
+        downloadFile(csvContent, `candidatos_compilados_${sanitized}${filterSuffix}_${date}.csv`, 'text/csv;charset=utf-8;');
+      } else {
+        downloadCompiledXLSX(
+          filteredCandidates,
+          allCandidatesAnswersMap,
+          selectedInstitution.name || ''
+        );
+      }
+    } catch (err) {
+      alert('Erro ao exportar dados compilados. Tente novamente.');
+      console.error(err);
+    } finally {
+      setIsExportingCompiled(false);
+    }
+  };
+
   // Handler de exportação de todos os candidatos
   const handleExport = async (format: 'csv' | 'xlsx') => {
     if (!selectedInstitution || filteredCandidates.length === 0) return;
@@ -1197,19 +1389,19 @@ function App() {
         const sanitizedName = (selectedInstitution.name || '')
           .replace(/[^a-z0-9]/gi, '_')
           .toLowerCase();
-        const etapaSuffix = selectedEtapa
-          ? `_${selectedEtapa.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`
-          : '';
+        const filterSuffix =
+          selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0
+            ? '_filtro'
+            : '';
         const date = new Date().toISOString().split('T')[0];
-        const filename = `candidatos_${sanitizedName}${etapaSuffix}_${date}.csv`;
+        const filename = `candidatos_${sanitizedName}${filterSuffix}_${date}.csv`;
         downloadFile(csvContent, filename, 'text/csv;charset=utf-8;');
       } else if (format === 'xlsx') {
-        // Gerar e fazer download de XLSX
         downloadXLSXWithFilter(
           selectedInstitution,
           filteredCandidates,
           answersMap,
-          selectedEtapa
+          selectedEtapas.length > 0 ? selectedEtapas.join('_') : undefined
         );
       }
     } catch (err) {
@@ -1266,10 +1458,9 @@ function App() {
       setAnswers([]);
       setAllCandidatesAnswersMap(new Map());
       setSelectedInstitution(null);
-      setSelectedEtapa(null);
-      setSelectedQuestion(null);
-      setSelectedAnswer(null);
-      setSelectedInactivity(null);
+      setSelectedEtapas([]);
+      setSelectedAnswerFilters([]);
+      setSelectedInactivities([]);
       setError(null);
       setCandidatesError(null);
       setAnswersError(null);
@@ -1309,99 +1500,105 @@ function App() {
         username={username}
       />
       <div className="app-container">
-        <div className="left-column">
-          <div className="profile-chart-container">
-            <InstitutionProfile institution={selectedInstitution} />
-            {selectedInstitution && candidates.length > 0 ? (
-              <>
-                <EtapasChart
-                  candidates={candidates}
-                  answersMap={allCandidatesAnswersMap}
-                  onEtapaClick={(etapa) => {
-                    setSelectedEtapa(etapa);
-                    // Limpar filtro de resposta ao filtrar por etapa
-                    if (etapa) {
-                      setSelectedQuestion(null);
-                      setSelectedAnswer(null);
-                    }
-                  }}
-                  selectedEtapa={selectedEtapa}
+        {(selectedInstitution && !isInitialDataReady) || (isAuthenticated && isLoading && !selectedInstitution) ? (
+          <div className="loading-overlay-wrapper">
+            <LoadingOverlay progress={loadingProgress} phase={loadingPhase} />
+          </div>
+        ) : (
+          <>
+            <div className="left-column">
+              <div className="profile-chart-container">
+                <InstitutionProfile institution={selectedInstitution} />
+                {selectedInstitution && candidates.length > 0 ? (
+                  <>
+                    <EtapasChart
+                      candidates={candidates}
+                      answersMap={allCandidatesAnswersMap}
+                      onEtapaClick={(etapa) => {
+                        setSelectedEtapas((prev) =>
+                          prev.includes(etapa) ? prev.filter((e) => e !== etapa) : [...prev, etapa]
+                        );
+                      }}
+                      selectedEtapas={selectedEtapas}
+                    />
+                    <InactivityChart
+                      candidates={candidates}
+                      answersMap={allCandidatesAnswersMap}
+                      onInactivityClick={(type) => {
+                        if (type === null) return;
+                        setSelectedInactivities((prev) => {
+                          const already = prev.some(
+                            (s) => s === type || (typeof s === 'number' && typeof type === 'number' && s === type)
+                          );
+                          if (already) return prev.filter((s) => s !== type);
+                          return [...prev, type];
+                        });
+                      }}
+                      selectedInactivities={selectedInactivities}
+                    />
+                    <AnswersChart
+                      candidates={candidates}
+                      answersMap={allCandidatesAnswersMap}
+                      onAnswerClick={(question, answer) => {
+                        if (question === null || answer === null) return;
+                        setSelectedAnswerFilters((prev) => {
+                          const already = prev.some((f) => f.question === question && f.answer === answer);
+                          if (already) return prev.filter((f) => !(f.question === question && f.answer === answer));
+                          return [...prev, { question, answer }];
+                        });
+                      }}
+                      selectedAnswerFilters={selectedAnswerFilters}
+                      defaultQuestion={17}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="full-width-column">
+              <CandidatesTable
+                candidates={filteredCandidates}
+                allCandidates={candidates}
+                isLoading={isLoadingCandidates}
+                error={candidatesError}
+                onRetry={handleRetryCandidates}
+                onSelectCandidate={handleSelectCandidate}
+                selectedCandidateId={selectedCandidate?.id || null}
+                onExport={handleExport}
+                isExporting={isExporting}
+                onExportCompiled={handleExportCompiled}
+                isExportingCompiled={isExportingCompiled}
+                answersMap={allCandidatesAnswersMap}
+                selectedEtapas={selectedEtapas}
+                selectedAnswerFilters={selectedAnswerFilters}
+                selectedInactivities={selectedInactivities}
+                onClearFilter={() => {
+                  setSelectedEtapas([]);
+                  setSelectedAnswerFilters([]);
+                  setSelectedInactivities([]);
+                }}
+                totalCandidates={candidates.length}
+              />
+            </div>
+            {selectedCandidate && (
+              <div className="full-width-column">
+                <CandidateAnswersPanel
+                  candidate={selectedCandidate}
+                  answers={answers}
+                  isLoading={isLoadingAnswers}
+                  error={answersError}
+                  onRetry={handleRetryAnswers}
+                  onExport={handleExportCandidate}
+                  isExporting={isExportingCandidate}
                 />
-                <InactivityChart
-                  candidates={candidates}
-                  answersMap={allCandidatesAnswersMap}
-                  onInactivityClick={(type) => {
-                    setSelectedInactivity(type);
-                    // Limpar outros filtros ao filtrar por inatividade
-                    if (type !== null) {
-                      setSelectedEtapa(null);
-                      setSelectedQuestion(null);
-                      setSelectedAnswer(null);
-                    }
-                  }}
-                  selectedInactivity={selectedInactivity}
-                />
-                <AnswersChart
-                  candidates={candidates}
-                  answersMap={allCandidatesAnswersMap}
-                  onAnswerClick={(question, answer) => {
-                    setSelectedQuestion(question);
-                    setSelectedAnswer(answer);
-                    // Limpar outros filtros ao filtrar por resposta
-                    if (question !== null) {
-                      setSelectedEtapa(null);
-                      setSelectedInactivity(null);
-                    }
-                  }}
-                  selectedQuestion={selectedQuestion}
-                  selectedAnswer={selectedAnswer}
-                  defaultQuestion={17}
-                />
-              </>
-            ) : (
-              <>
-                <div></div>
-                <div></div>
-                <div></div>
-              </>
+              </div>
             )}
-          </div>
-        </div>
-        <div className="full-width-column">
-          <CandidatesTable
-            candidates={filteredCandidates}
-            allCandidates={candidates}
-            isLoading={isLoadingCandidates}
-            error={candidatesError}
-            onRetry={handleRetryCandidates}
-            onSelectCandidate={handleSelectCandidate}
-            selectedCandidateId={selectedCandidate?.id || null}
-            onExport={handleExport}
-            isExporting={isExporting}
-            answersMap={allCandidatesAnswersMap}
-            selectedEtapa={selectedEtapa}
-            selectedQuestion={selectedQuestion}
-            selectedAnswer={selectedAnswer}
-            onClearFilter={() => {
-              setSelectedEtapa(null);
-              setSelectedQuestion(null);
-              setSelectedAnswer(null);
-            }}
-            totalCandidates={candidates.length}
-          />
-        </div>
-        {selectedCandidate && (
-          <div className="full-width-column">
-            <CandidateAnswersPanel
-              candidate={selectedCandidate}
-              answers={answers}
-              isLoading={isLoadingAnswers}
-              error={answersError}
-              onRetry={handleRetryAnswers}
-              onExport={handleExportCandidate}
-              isExporting={isExportingCandidate}
-            />
-          </div>
+          </>
         )}
       </div>
     </div>

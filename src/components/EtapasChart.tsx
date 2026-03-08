@@ -5,8 +5,8 @@ import { Answer } from '../types/answer';
 interface EtapasChartProps {
   candidates: Candidate[];
   answersMap: Map<string, Answer[]>;
-  onEtapaClick?: (etapa: string | null) => void;
-  selectedEtapa?: string | null;
+  onEtapaClick?: (etapa: string) => void;
+  selectedEtapas?: string[];
 }
 
 interface EtapaData {
@@ -18,7 +18,7 @@ export const EtapasChart = ({
   candidates,
   answersMap,
   onEtapaClick,
-  selectedEtapa,
+  selectedEtapas = [],
 }: EtapasChartProps) => {
   const getEtapa = (question: number): string => {
     if (question >= 1 && question <= 1) {
@@ -115,7 +115,7 @@ export const EtapasChart = ({
       </div>
       <div className="chart-content">
         {etapasData.map((etapa) => {
-          const isSelected = selectedEtapa === etapa.nome;
+          const isSelected = selectedEtapas.includes(etapa.nome);
           return (
             <div
               key={etapa.nome}
@@ -124,7 +124,7 @@ export const EtapasChart = ({
               }`}
               onClick={() => {
                 if (etapa.quantidade > 0 && onEtapaClick) {
-                  onEtapaClick(isSelected ? null : etapa.nome);
+                  onEtapaClick(etapa.nome);
                 }
               }}
             >
