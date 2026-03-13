@@ -54,7 +54,7 @@ export const NavigationHeader = ({
             className="nav-button nav-button-primary"
             style={{ textDecoration: 'none' }}
           >
-            home
+            Home
           </Link>
           <InstitutionSelector
             institutions={institutions}
