@@ -568,7 +568,7 @@ export const CandidatesTable = ({
                   disabled={isExportingCompiled}
                   className={`export-button ${showCompiledExportMenu ? 'open' : ''}`}
                 >
-                  {isExportingCompiled ? 'Exportando...' : 'Extrair dados compilados'}
+                  {isExportingCompiled ? 'Exportando...' : 'Extrair dados completos'}
                   <svg
                     className="export-arrow"
                     width="12"

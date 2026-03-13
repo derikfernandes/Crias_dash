@@ -759,7 +759,7 @@ function App() {
     }
   };
 
-  // Dados compilados: um aluno por linha (cadastrais + etapa + questão parou + dias última mensagem)
+  // Dados compilados/completos: um aluno por linha
   const generateCompiledData = (
     candidates: Candidate[],
     answersMap: Map<string, Answer[]>
@@ -767,7 +767,7 @@ function App() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const headers = [
+    const baseHeaders = [
       'Nome',
       'Telefone',
       'E-mail',
@@ -782,7 +782,16 @@ function App() {
       'Dias da última mensagem',
     ];
 
-    const rows: string[][] = [headers];
+    const questionNumbers = Object.keys(QUESTIONS)
+      .map((k) => Number(k))
+      .filter((n) => !Number.isNaN(n))
+      .sort((a, b) => a - b);
+
+    const questionHeaders = questionNumbers.map(
+      (q) => QUESTIONS[q] || `Questão ${q}`
+    );
+
+    const rows: string[][] = [[...baseHeaders, ...questionHeaders]];
 
     candidates.forEach((candidate) => {
       const cid = candidate.id || '';
@@ -823,6 +832,17 @@ function App() {
         diasUltimaMensagem = String(Math.max(0, days));
       }
 
+      const byQuestion = new Map<number, string>();
+      answers.forEach((a) => {
+        if (a.question !== undefined) {
+          const raw = a.answer || '';
+          const formatted = getFormattedAnswer(a.question, raw);
+          byQuestion.set(a.question, formatted || raw);
+        }
+      });
+
+      const questionCells = questionNumbers.map((q) => byQuestion.get(q) || '');
+
       rows.push([
         candidate.name || '',
         candidate.whatsapp || '',
@@ -836,6 +856,7 @@ function App() {
         etapa,
         questaoParou,
         diasUltimaMensagem,
+        ...questionCells,
       ]);
     });
 
@@ -864,10 +885,10 @@ function App() {
     ];
     ws['!cols'] = colWidths;
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Dados compilados');
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados completos');
     const sanitized = (institutionName || 'inst').replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const date = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `candidatos_compilados_${sanitized}_${date}.xlsx`);
+    XLSX.writeFile(wb, `candidatos_completos_${sanitized}_${date}.xlsx`);
   };
 
   // Função para gerar CSV
@@ -1332,7 +1353,7 @@ function App() {
     XLSX.writeFile(wb, filename);
   };
 
-  // Handler de exportação "dados compilados" (um candidato por linha)
+  // Handler de exportação "dados completos" (um candidato por linha, todas as questões em colunas)
   const handleExportCompiled = (format: 'csv' | 'xlsx') => {
     if (!selectedInstitution || filteredCandidates.length === 0) return;
     setIsExportingCompiled(true);
@@ -1347,7 +1368,11 @@ function App() {
             ? '_filtro'
             : '';
         const date = new Date().toISOString().split('T')[0];
-        downloadFile(csvContent, `candidatos_compilados_${sanitized}${filterSuffix}_${date}.csv`, 'text/csv;charset=utf-8;');
+        downloadFile(
+          csvContent,
+          `candidatos_completos_${sanitized}${filterSuffix}_${date}.csv`,
+          'text/csv;charset=utf-8;'
+        );
       } else {
         downloadCompiledXLSX(
           filteredCandidates,
@@ -1356,7 +1381,7 @@ function App() {
         );
       }
     } catch (err) {
-      alert('Erro ao exportar dados compilados. Tente novamente.');
+      alert('Erro ao exportar dados completos. Tente novamente.');
       console.error(err);
     } finally {
       setIsExportingCompiled(false);
