@@ -49,7 +49,7 @@ export const ANSWER_MAPPINGS: Record<number, Record<string, string>> = {
   },
   19: {
     'A': 'Pública',
-    'B': 'Privada',
+    'B': 'Particular',
   },
   20: {
     'A': 'Sim, bolsa por desempenho acadêmico',
@@ -76,6 +76,8 @@ export const ANSWER_MAPPINGS: Record<number, Record<string, string>> = {
     'C': 'LALA',
     'D': 'Arco',
     'E': 'Não participo',
+    'F': 'Pulse Mais',
+    'G': 'Meninas em Campo',
   },
   27: {
     'A': 'Mãe/Pai',
