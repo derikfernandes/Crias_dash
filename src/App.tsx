@@ -1573,7 +1573,7 @@ function App() {
                         });
                       }}
                       selectedAnswerFilters={selectedAnswerFilters}
-                      defaultQuestion={17}
+                      defaultQuestion={60}
                     />
                   </>
                 ) : (
