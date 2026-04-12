@@ -90,6 +90,13 @@ export const NavigationHeader = ({
         >
           Detalhes →
         </Link>
+        <Link
+          to="/estagio"
+          className="nav-button nav-button-primary"
+          style={{ textDecoration: 'none' }}
+        >
+          Estágio →
+        </Link>
         {canAccessGerenciamento && (
           <Link
             to="/gerenciamento"
