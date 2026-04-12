@@ -14,6 +14,7 @@ import { LoadingOverlay } from './components/LoadingOverlay';
 import { Gerenciamento } from './pages/Gerenciamento';
 import { Login } from './pages/Login';
 import { Graficos } from './pages/Graficos';
+import { Estagio } from './pages/Estagio';
 import { useInstitution } from './contexts/InstitutionContext';
 import { AUTH_HEADER } from './utils/api';
 import { QUESTIONS } from './utils/questions';
@@ -1708,12 +1709,33 @@ function App() {
     </div>
   );
 
+  const EstagioPage = () => (
+    <div className="app">
+      <NavigationHeader
+        institutions={institutions}
+        selectedInstitution={selectedInstitution}
+        onSelectInstitution={handleSelect}
+        onRefresh={handleRefreshAll}
+        isLoading={isLoading || isLoadingCandidates}
+        error={error}
+        onRetry={handleRetry}
+        onLogout={handleLogout}
+        canAccessGerenciamento={canAccessGerenciamento}
+        title="Etapas"
+        lastUpdateDate={lastUpdateDate}
+        username={username}
+      />
+      <Estagio />
+    </div>
+  );
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/gerenciamento" element={<GerenciamentoPage />} />
       <Route path="/detalhe" element={<DetalhePage />} />
+      <Route path="/estagio" element={<EstagioPage />} />
     </Routes>
   );
 }
