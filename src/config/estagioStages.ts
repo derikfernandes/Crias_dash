@@ -15,6 +15,14 @@ export const ESTAGIO_STAGES: StageDefinition[] = [
     code: 'E2_DES_PR',
     name: 'Etapa 2 — desclassificados na prova',
   },
+  {
+    code: '3',
+    name: 'Etapa 3',
+  },
+  {
+    code: '4',
+    name: 'Etapa 4',
+  },
 ];
 
 const MAX_CODE_LEN = 10;

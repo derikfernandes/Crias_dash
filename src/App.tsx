@@ -22,6 +22,9 @@ import { getFormattedAnswer, getQuestionOptions } from './utils/answerMappings';
 import { getCandidateEtapa as getCandidateEtapaUtil } from './utils/etapaUtils';
 import { cache, getAnswersCacheKey, getCandidatesCacheKey } from './utils/cache';
 import { processInBatches } from './utils/batchProcessor';
+import type { CandidateStageRecord } from './types/candidateStage';
+import { ESTAGIO_STAGES } from './config/estagioStages';
+import { fetchAllCandidateStagesMap } from './utils/candidateStageApi';
 import * as XLSX from 'xlsx';
 import './App.css';
 
@@ -37,6 +40,7 @@ function App() {
   const [allCandidatesAnswersMap, setAllCandidatesAnswersMap] = useState<
     Map<string, Answer[]>
   >(new Map());
+  const [candidateStagesMap, setCandidateStagesMap] = useState<Map<string, CandidateStageRecord[]>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
@@ -60,6 +64,33 @@ function App() {
     !!selectedInstitution &&
     !isLoadingCandidates &&
     (candidates.length === 0 || initialAnswersLoadComplete);
+
+  const stageNameByCode = useMemo(
+    () => new Map(ESTAGIO_STAGES.map((s) => [s.code, s.name])),
+    []
+  );
+
+  const pickLatestStageRecord = (stages: CandidateStageRecord[]): CandidateStageRecord | null => {
+    const withDate = stages.filter((s) => s.enabledAt);
+    if (withDate.length > 0) {
+      return withDate.reduce((a, b) => {
+        const ta = new Date(a.enabledAt || '').getTime() || 0;
+        const tb = new Date(b.enabledAt || '').getTime() || 0;
+        return tb >= ta ? b : a;
+      });
+    }
+    const withId = stages.filter((s) => s.id != null);
+    if (withId.length === 0) return null;
+    return withId.reduce((a, b) => ((a.id || 0) > (b.id || 0) ? a : b));
+  };
+
+  const getCandidateStageName = (candidateId?: string): string => {
+    if (!candidateId) return 'Sem stage';
+    const rows = candidateStagesMap.get(candidateId) || [];
+    const latest = pickLatestStageRecord(rows);
+    const code = latest?.code || '';
+    return stageNameByCode.get(code) || 'Sem stage';
+  };
 
   const fetchInstitutions = async () => {
     setIsLoading(true);
@@ -406,6 +437,39 @@ function App() {
       }
     }
   }, [selectedInstitution?.id, candidates.length, isAuthenticated]);
+
+  useEffect(() => {
+    const instId = selectedInstitution?.id;
+    if (!isAuthenticated || !instId || candidates.length === 0) {
+      setCandidateStagesMap(new Map());
+      return;
+    }
+
+    const ac = new AbortController();
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const next = await fetchAllCandidateStagesMap(instId, candidates, {
+          signal: ac.signal,
+        });
+        if (!cancelled) {
+          setCandidateStagesMap(next);
+        }
+      } catch {
+        if (!cancelled) {
+          setCandidateStagesMap(new Map());
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [selectedInstitution?.id, candidates, isAuthenticated]);
 
   const handleSelect = (institution: Institution) => {
     setSelectedInstitution(institution);
@@ -779,6 +843,7 @@ function App() {
       'Atualizado em',
       'ID',
       'Etapa',
+      'Stage',
       'Questão parou',
       'Dias da última mensagem',
     ];
@@ -798,6 +863,7 @@ function App() {
       const cid = candidate.id || '';
       const answers = answersMap.get(cid) || [];
       const etapa = getCandidateEtapaUtil(cid, answersMap);
+      const stage = getCandidateStageName(cid);
 
       let questaoParou = '';
       let lastDate: Date | null = null;
@@ -855,6 +921,7 @@ function App() {
         formatDateForExport(candidate.updatedAt),
         cid,
         etapa,
+        stage,
         questaoParou,
         diasUltimaMensagem,
         ...questionCells,
@@ -1548,6 +1615,7 @@ function App() {
                       selectedEtapas={selectedEtapas}
                     />
                     <InactivityChart
+                      institutionId={selectedInstitution.id}
                       candidates={candidates}
                       answersMap={allCandidatesAnswersMap}
                       onInactivityClick={(type) => {
@@ -1609,6 +1677,7 @@ function App() {
                   setSelectedInactivities([]);
                 }}
                 totalCandidates={candidates.length}
+                getCandidateStageName={getCandidateStageName}
               />
             </div>
             {selectedCandidate && (
