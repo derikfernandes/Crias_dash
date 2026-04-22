@@ -23,6 +23,7 @@ interface CandidatesTableProps {
   selectedInactivities?: ('finalized' | 'notFinalized' | number)[];
   onClearFilter?: () => void;
   totalCandidates?: number;
+  getCandidateStageName?: (candidateId?: string) => string;
 }
 
 export const CandidatesTable = ({
@@ -43,6 +44,7 @@ export const CandidatesTable = ({
   selectedInactivities = [],
   onClearFilter,
   totalCandidates,
+  getCandidateStageName,
 }: CandidatesTableProps) => {
   const hasChartFilters = selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0;
   const [isCandidateFilterOpen, setIsCandidateFilterOpen] = useState(false);
@@ -118,6 +120,9 @@ export const CandidatesTable = ({
       if (sortBy === 'etapa') {
         valA = getCandidateEtapa(a.id || '', answersMap);
         valB = getCandidateEtapa(b.id || '', answersMap);
+      } else if (sortBy === 'stage') {
+        valA = getCandidateStageName ? getCandidateStageName(a.id) : 'Sem stage';
+        valB = getCandidateStageName ? getCandidateStageName(b.id) : 'Sem stage';
       } else {
         valA = a[sortBy];
         valB = b[sortBy];
@@ -147,7 +152,7 @@ export const CandidatesTable = ({
       if (!Number.isNaN(numA) && !Number.isNaN(numB)) return dir * (numA - numB);
       return dir * String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
     });
-  }, [displayedCandidates, sortBy, sortDirection, answersMap]);
+  }, [displayedCandidates, sortBy, sortDirection, answersMap, getCandidateStageName]);
 
   // Calcular paginação
   const totalPages = Math.max(1, Math.ceil(sortedCandidates.length / ITEMS_PER_PAGE));
@@ -654,18 +659,35 @@ export const CandidatesTable = ({
                   )}
                 </span>
               </th>
+              <th
+                className="sortable-th"
+                onClick={() => handleSort('stage')}
+                title={`Ordenar por Stage (${sortBy === 'stage' && sortDirection === 'asc' ? 'clique para descrescente' : 'clique para crescente'})`}
+              >
+                <span className="th-content">
+                  Stage
+                  {sortBy === 'stage' && (
+                    <span className="sort-indicator" aria-hidden>
+                      {sortDirection === 'asc' ? ' ▲' : ' ▼'}
+                    </span>
+                  )}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {paginatedCandidates.length === 0 ? (
               <tr>
-                <td colSpan={orderedColumns.length + 1} style={{ textAlign: 'center', padding: '2rem' }}>
+                <td colSpan={orderedColumns.length + 2} style={{ textAlign: 'center', padding: '2rem' }}>
                   Nenhum candidato encontrado nesta página.
                 </td>
               </tr>
             ) : (
               paginatedCandidates.map((candidate) => {
                 const etapa = getCandidateEtapa(candidate.id || '', answersMap);
+                const stageName = getCandidateStageName
+                  ? getCandidateStageName(candidate.id)
+                  : 'Sem stage';
                 return (
                   <tr
                     key={candidate.id}
@@ -691,6 +713,9 @@ export const CandidatesTable = ({
                       >
                         {etapa}
                       </span>
+                    </td>
+                    <td>
+                      <span className="etapa-badge in-progress">{stageName}</span>
                     </td>
                   </tr>
                 );
