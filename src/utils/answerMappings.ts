@@ -1,6 +1,6 @@
 // Mapeamento de respostas de questões fechadas
 // Formato: { questão: { resposta: texto_formatado } }
-// IDs das questões: 1 a 66
+// IDs das questões: 1 a 67
 
 export const ANSWER_MAPPINGS: Record<number, Record<string, string>> = {
   8: {

@@ -621,7 +621,7 @@ function App() {
     }
   };
 
-  // Função auxiliar para obter etapa por questão (questões 1 a 66)
+  // Função auxiliar para obter etapa por questão
   const getEtapa = (question: number): string => {
     if (question >= 1 && question <= 1) {
       return 'Inicial';
@@ -633,6 +633,8 @@ function App() {
       return 'Formulário Socioeconômico';
     } else if (question >= 60 && question <= 66) {
       return 'Sobre sua participação';
+    } else if (question === 67) {
+      return 'Etapa 3';
     }
     return 'Desconhecida';
   };

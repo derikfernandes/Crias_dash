@@ -43,6 +43,8 @@ export const AnswerTable = ({
       return 'Formulário Socioeconômico';
     } else if (question >= 60 && question <= 66) {
       return 'Sobre sua participação';
+    } else if (question === 67) {
+      return 'Etapa 3';
     }
     return 'Desconhecida';
   };
@@ -50,6 +52,32 @@ export const AnswerTable = ({
   const getQuestionText = (questionNumber: number | undefined): string => {
     if (questionNumber === undefined) return 'Enunciado não encontrado';
     return QUESTIONS[questionNumber] || 'Enunciado não encontrado';
+  };
+
+  const isLikelyUrl = (value: string): boolean => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const renderAnswerValue = (question: number | undefined, answerValue: string | undefined) => {
+    const value = answerValue || '';
+    if (question === 67 && isLikelyUrl(value)) {
+      return (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          Abrir arquivo
+        </a>
+      );
+    }
+    return value;
   };
 
   // Obter valor para ordenação conforme a coluna
@@ -240,7 +268,7 @@ export const AnswerTable = ({
                   {getQuestionText(answer.question)}
                 </td>
                 <td>{getEtapa(answer.question || 0)}</td>
-                <td>{answer.answer || ''}</td>
+                <td>{renderAnswerValue(answer.question, answer.answer)}</td>
                 <td className={hasMapping ? 'formatted-answer' : ''}>
                   {hasMapping ? formattedAnswer : answer.answer || ''}
                 </td>

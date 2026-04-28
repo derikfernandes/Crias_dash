@@ -36,6 +36,7 @@ export const CreateAnswerForm = ({
     'Conhecendo sua Família',
     'Formulário Socioeconômico',
     'Sobre sua participação',
+    'Etapa 3',
     'Finalizou',
   ];
 
@@ -45,8 +46,12 @@ export const CreateAnswerForm = ({
 
     const questions: Array<{ number: number; text: string; etapa: string }> = [];
     
-    // Gerar todas as questões de 1 a 66
-    for (let i = 1; i <= 66; i++) {
+    const questionNumbers = Object.keys(QUESTIONS)
+      .map((k) => Number(k))
+      .filter((n) => !Number.isNaN(n))
+      .sort((a, b) => a - b);
+
+    for (const i of questionNumbers) {
       const etapa = getEtapa(i);
       if (etapa === selectedEtapa) {
         questions.push({

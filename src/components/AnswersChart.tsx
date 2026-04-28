@@ -48,12 +48,17 @@ export const AnswersChart = ({
     'Conhecendo sua Família',
     'Formulário Socioeconômico',
     'Sobre sua participação',
+    'Etapa 3',
     'Finalizou',
   ];
 
-  // Obter lista de questões disponíveis (IDs 1 a 66), filtradas por etapa se selecionada
+  // Obter lista de questões disponíveis, filtradas por etapa se selecionada
   const availableQuestions = useMemo(() => {
-    const allQuestions = Array.from({ length: 66 }, (_, i) => i + 1).filter((q) => {
+    const allQuestions = Object.keys(QUESTIONS)
+      .map((k) => Number(k))
+      .filter((n) => !Number.isNaN(n))
+      .sort((a, b) => a - b)
+      .filter((q) => {
       // Verificar se pelo menos um candidato tem resposta para esta questão
       return Array.from(answersMap.values()).some((answers) =>
         answers.some((answer) => answer.question !== undefined && answer.question === q)
