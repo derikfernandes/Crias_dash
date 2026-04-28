@@ -11,6 +11,8 @@ export const getEtapa = (question: number): string => {
     return 'Formulário Socioeconômico';
   } else if (question >= 60 && question <= 66) {
     return 'Sobre sua participação';
+  } else if (question === 67) {
+    return 'Etapa 3';
   }
   return 'Desconhecida';
 };
@@ -25,9 +27,9 @@ export const getCandidateEtapa = (
     return 'Sem respostas';
   }
 
-  // Verificar se tem resposta na questão 66 (Finalizou)
-  const hasQuestion66 = answers.some((answer) => answer.question !== undefined && answer.question === 66);
-  if (hasQuestion66) {
+  // Verificar se tem resposta na questão 67 (Finalizou)
+  const hasQuestion67 = answers.some((answer) => answer.question !== undefined && answer.question === 67);
+  if (hasQuestion67) {
     return 'Finalizou';
   }
 

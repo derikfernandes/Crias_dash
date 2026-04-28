@@ -31,6 +31,8 @@ export const EtapasChart = ({
       return 'Formulário Socioeconômico';
     } else if (question >= 60 && question <= 66) {
       return 'Sobre sua participação';
+    } else if (question === 67) {
+      return 'Etapa 3';
     }
     return 'Desconhecida';
   };
@@ -43,6 +45,7 @@ export const EtapasChart = ({
       { nome: 'Conhecendo sua Família', quantidade: 0 },
       { nome: 'Formulário Socioeconômico', quantidade: 0 },
       { nome: 'Sobre sua participação', quantidade: 0 },
+      { nome: 'Etapa 3', quantidade: 0 },
       { nome: 'Finalizou', quantidade: 0 },
     ];
 
@@ -57,11 +60,11 @@ export const EtapasChart = ({
         return;
       }
 
-      // Verificar se tem resposta na questão 66 (Finalizou)
-      const hasQuestion66 = answers.some((answer) => answer.question === 66);
+      // Verificar se tem resposta na questão 67 (Finalizou)
+      const hasQuestion67 = answers.some((answer) => answer.question === 67);
 
-      if (hasQuestion66) {
-        // Se tem questão 66, está na etapa "Finalizou"
+      if (hasQuestion67) {
+        // Se tem questão 67, está na etapa "Finalizou"
         const etapaData = etapas.find((e) => e.nome === 'Finalizou');
         if (etapaData) {
           etapaData.quantidade += 1;

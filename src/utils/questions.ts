@@ -65,4 +65,5 @@ export const QUESTIONS: Record<number, string> = {
   64: '5. Quais aparelhos você utiliza para acessar a internet?',
   65: '6. Como é o seu acesso a(aos) esse(s) aparalho(s)?',
   66: '7. Como é o seu espaço de estudos?',
+  67: 'Envie sua redação, pode ser uma foto legível ou um PDF.',
 };

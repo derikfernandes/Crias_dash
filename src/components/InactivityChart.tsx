@@ -47,6 +47,7 @@ export const InactivityChart = ({
     () => new Map()
   );
   const [isLoadingStages, setIsLoadingStages] = useState(false);
+  const [stagesLoadProgress, setStagesLoadProgress] = useState(0);
 
   const stageNameByCode = useMemo(
     () => new Map(ESTAGIO_STAGES.map((s) => [s.code, s.name])),
@@ -57,6 +58,7 @@ export const InactivityChart = ({
     if (!institutionId || candidates.length === 0) {
       setStageMap(new Map());
       setIsLoadingStages(false);
+      setStagesLoadProgress(0);
       return;
     }
 
@@ -65,16 +67,23 @@ export const InactivityChart = ({
 
     const run = async () => {
       setIsLoadingStages(true);
+      setStagesLoadProgress(0);
       try {
         const next = await fetchAllCandidateStagesMap(institutionId, candidates, {
           signal: ac.signal,
+          onProgress: (done, total) => {
+            if (cancelled || total === 0) return;
+            setStagesLoadProgress(Math.round((done / total) * 100));
+          },
         });
         if (!cancelled) {
           setStageMap(next);
+          setStagesLoadProgress(100);
         }
       } catch {
         if (!cancelled) {
           setStageMap(new Map());
+          setStagesLoadProgress(0);
         }
       } finally {
         if (!cancelled) {
@@ -247,7 +256,7 @@ export const InactivityChart = ({
         {/* Gráfico de stages */}
         {isLoadingStages ? (
           <div className="empty-message" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }}>
-            Carregando stages da API...
+            Carregando stages da API... {stagesLoadProgress}%
           </div>
         ) : chartData.stageData.length === 0 ? (
           <div className="empty-message" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }}>

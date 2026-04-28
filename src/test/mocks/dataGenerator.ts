@@ -49,7 +49,7 @@ function generateDate(daysAgo: number = 0): string {
   return date.toISOString();
 }
 
-function generateAnswers(candidateId: string, maxQuestions: number = 66): Answer[] {
+function generateAnswers(candidateId: string, maxQuestions: number = 67): Answer[] {
   const answers: Answer[] = [];
   const numAnswers = Math.min(Math.floor(Math.random() * maxQuestions) + 1, maxQuestions);
   
@@ -62,7 +62,7 @@ function generateAnswers(candidateId: string, maxQuestions: number = 66): Answer
     } else if (question >= 2 && question <= 25) {
       const options = ['Opção A', 'Opção B', 'Opção C', 'Sim', 'Não'];
       answer = options[Math.floor(Math.random() * options.length)];
-    } else if (question === 66) {
+    } else if (question === 67) {
       answer = 'Finalizado';
     } else {
       answer = `Resposta ${question}`;
