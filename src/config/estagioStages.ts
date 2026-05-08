@@ -17,11 +17,11 @@ export const ESTAGIO_STAGES: StageDefinition[] = [
   },
   {
     code: '3',
-    name: 'Etapa 3',
+    name: 'Etapa 3 — Envio de Redação',
   },
   {
     code: '4',
-    name: 'Etapa 4',
+    name: 'Etapa 4 — Formulário Socioemocional',
   },
 ];
 

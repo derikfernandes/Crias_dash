@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Candidate } from '../types/candidate';
 import { Answer } from '../types/answer';
 import type { CandidateStageRecord } from '../types/candidateStage';
 import { ESTAGIO_STAGES } from '../config/estagioStages';
-import { fetchAllCandidateStagesMap } from '../utils/candidateStageApi';
-import { getCandidateEtapa } from '../utils/etapaUtils';
+import { getFinalizationQuestionForStages } from '../utils/finalizationRules';
 
 interface InactivityChartProps {
-  institutionId?: string | null;
   candidates: Candidate[];
   answersMap: Map<string, Answer[]>;
   onInactivityClick?: (type: 'finalized' | 'notFinalized' | number) => void;
   selectedInactivities?: ('finalized' | 'notFinalized' | number)[];
+  stageMap?: Map<string, CandidateStageRecord[]>;
+  isLoadingStages?: boolean;
+  stagesLoadProgress?: number;
+  onStageClick?: (stage: string) => void;
+  selectedStages?: string[];
 }
 
 interface StageData {
@@ -34,91 +37,60 @@ function pickLatestRecord(stages: CandidateStageRecord[]): CandidateStageRecord 
 }
 
 export const InactivityChart = ({
-  institutionId = null,
   candidates,
   answersMap,
   onInactivityClick,
   selectedInactivities = [],
+  stageMap = new Map(),
+  isLoadingStages = false,
+  stagesLoadProgress = 0,
+  onStageClick,
+  selectedStages = [],
 }: InactivityChartProps) => {
   const isSelected = (type: 'finalized' | 'notFinalized' | number) =>
     selectedInactivities.some((s) => s === type || (typeof s === 'number' && typeof type === 'number' && s === type));
-
-  const [stageMap, setStageMap] = useState<Map<string, CandidateStageRecord[]>>(
-    () => new Map()
-  );
-  const [isLoadingStages, setIsLoadingStages] = useState(false);
-  const [stagesLoadProgress, setStagesLoadProgress] = useState(0);
+  const isStageSelected = (stage: string) => selectedStages.includes(stage);
 
   const stageNameByCode = useMemo(
     () => new Map(ESTAGIO_STAGES.map((s) => [s.code, s.name])),
     []
   );
 
-  useEffect(() => {
-    if (!institutionId || candidates.length === 0) {
-      setStageMap(new Map());
-      setIsLoadingStages(false);
-      setStagesLoadProgress(0);
-      return;
-    }
-
-    const ac = new AbortController();
-    let cancelled = false;
-
-    const run = async () => {
-      setIsLoadingStages(true);
-      setStagesLoadProgress(0);
-      try {
-        const next = await fetchAllCandidateStagesMap(institutionId, candidates, {
-          signal: ac.signal,
-          onProgress: (done, total) => {
-            if (cancelled || total === 0) return;
-            setStagesLoadProgress(Math.round((done / total) * 100));
-          },
-        });
-        if (!cancelled) {
-          setStageMap(next);
-          setStagesLoadProgress(100);
-        }
-      } catch {
-        if (!cancelled) {
-          setStageMap(new Map());
-          setStagesLoadProgress(0);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingStages(false);
-        }
-      }
-    };
-
-    void run();
-
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
-  }, [institutionId, candidates]);
+  const getCandidateStageName = (candidateId?: string): string => {
+    if (!candidateId) return 'Sem stage';
+    const candidateStages = stageMap.get(candidateId) || [];
+    const latest = pickLatestRecord(candidateStages);
+    const stageCode = latest?.code || '';
+    return stageNameByCode.get(stageCode) || (stageCode ? stageCode : 'Sem stage');
+  };
 
   const chartData = useMemo(() => {
+    const finalizationQuestion = getFinalizationQuestionForStages(selectedStages);
+    const scopedCandidates =
+      selectedStages.length > 0
+        ? candidates.filter((candidate) =>
+            selectedStages.includes(getCandidateStageName(candidate.id))
+          )
+        : candidates;
+
     const finalized: Candidate[] = [];
     const notFinalized: Candidate[] = [];
     const stageCountMap = new Map<string, number>();
 
-    // Separar candidatos finalizados/não finalizados
-    candidates.forEach((candidate) => {
-      const etapa = getCandidateEtapa(candidate.id || '', answersMap);
-      if (etapa === 'Finalizou') {
+    // Separar candidatos finalizados/não finalizados conforme etapa selecionada
+    scopedCandidates.forEach((candidate) => {
+      const answers = answersMap.get(candidate.id || '') || [];
+      const isFinalized = answers.some(
+        (a) => a.question !== undefined && a.question === finalizationQuestion
+      );
+      if (isFinalized) {
         finalized.push(candidate);
       } else {
         notFinalized.push(candidate);
       }
 
-      // Contagem de stage para TODOS os candidatos (não só não finalizados)
-      const candidateStages = stageMap.get(candidate.id || '') || [];
-      const latest = pickLatestRecord(candidateStages);
-      const stageCode = latest?.code || '';
-      const stageLabel = stageNameByCode.get(stageCode) || (stageCode ? stageCode : 'Sem stage');
+      // Contagem de stage para todos os candidatos no escopo atual
+      const stageLabel = getCandidateStageName(candidate.id);
       stageCountMap.set(stageLabel, (stageCountMap.get(stageLabel) || 0) + 1);
     });
 
@@ -135,11 +107,12 @@ export const InactivityChart = ({
       });
 
     return {
+      total: scopedCandidates.length,
       finalized: finalized.length,
       notFinalized: notFinalized.length,
       stageData,
     };
-  }, [answersMap, candidates, stageMap, stageNameByCode]);
+  }, [answersMap, candidates, stageMap, stageNameByCode, selectedStages]);
 
   const maxQuantidade = Math.max(
     ...chartData.stageData.map((d) => d.quantidade),
@@ -148,7 +121,7 @@ export const InactivityChart = ({
     1
   );
 
-  if (candidates.length === 0) {
+  if (chartData.total === 0) {
     return (
       <div className="chart-container">
         <h3 className="chart-title">Finalizados e Inatividade</h3>
@@ -163,7 +136,7 @@ export const InactivityChart = ({
     <div className="chart-container">
       <div className="chart-header">
         <h3 className="chart-title">Finalizados e Inatividade</h3>
-        <span className="chart-total">Total: {candidates.length}</span>
+        <span className="chart-total">Total: {chartData.total}</span>
       </div>
       <div className="chart-content">
         {/* Barra de Finalizados - clicável para filtrar */}
@@ -181,10 +154,10 @@ export const InactivityChart = ({
             <span className="chart-bar-name">✅ Finalizados</span>
             <span className="chart-bar-value">
               {chartData.finalized}
-              {candidates.length > 0 && (
+              {chartData.total > 0 && (
                 <span className="chart-bar-percentage">
                   {' '}
-                  ({Math.round((chartData.finalized / candidates.length) * 100)}%)
+                  ({Math.round((chartData.finalized / chartData.total) * 100)}%)
                 </span>
               )}
             </span>
@@ -216,10 +189,10 @@ export const InactivityChart = ({
             <span className="chart-bar-name">⏸️ Não Finalizados</span>
             <span className="chart-bar-value">
               {chartData.notFinalized}
-              {candidates.length > 0 && (
+              {chartData.total > 0 && (
                 <span className="chart-bar-percentage">
                   {' '}
-                  ({Math.round((chartData.notFinalized / candidates.length) * 100)}%)
+                  ({Math.round((chartData.notFinalized / chartData.total) * 100)}%)
                 </span>
               )}
             </span>
@@ -267,16 +240,23 @@ export const InactivityChart = ({
             return (
               <div
                 key={item.stage}
-                className="chart-bar-item"
+                className={`chart-bar-item ${isStageSelected(item.stage) ? 'selected' : ''} ${
+                  item.quantidade > 0 ? 'clickable' : ''
+                }`}
+                onClick={() => {
+                  if (item.quantidade > 0 && onStageClick) {
+                    onStageClick(item.stage);
+                  }
+                }}
               >
                 <div className="chart-bar-label">
                   <span className="chart-bar-name">{item.stage}</span>
                   <span className="chart-bar-value">
                     {item.quantidade}
-                    {candidates.length > 0 && (
+                    {chartData.total > 0 && (
                       <span className="chart-bar-percentage">
                         {' '}
-                        ({Math.round((item.quantidade / candidates.length) * 100)}%)
+                        ({Math.round((item.quantidade / chartData.total) * 100)}%)
                       </span>
                     )}
                   </span>

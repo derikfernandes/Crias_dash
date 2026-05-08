@@ -19,6 +19,7 @@ interface CandidatesTableProps {
   isExportingCompiled?: boolean;
   answersMap: Map<string, Answer[]>;
   selectedEtapas?: string[];
+  selectedStages?: string[];
   selectedAnswerFilters?: { question: number; answer: string }[];
   selectedInactivities?: ('finalized' | 'notFinalized' | number)[];
   onClearFilter?: () => void;
@@ -40,13 +41,14 @@ export const CandidatesTable = ({
   isExportingCompiled,
   answersMap,
   selectedEtapas = [],
+  selectedStages = [],
   selectedAnswerFilters = [],
   selectedInactivities = [],
   onClearFilter,
   totalCandidates,
   getCandidateStageName,
 }: CandidatesTableProps) => {
-  const hasChartFilters = selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0;
+  const hasChartFilters = selectedEtapas.length > 0 || selectedStages.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0;
   const [isCandidateFilterOpen, setIsCandidateFilterOpen] = useState(false);
   const [searchTermCandidate, setSearchTermCandidate] = useState('');
   const [selectedCandidateFilter, setSelectedCandidateFilter] = useState<Candidate | null>(null);
@@ -187,7 +189,7 @@ export const CandidatesTable = ({
   // Resetar para página 1 quando filtros mudarem
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedEtapas, selectedAnswerFilters, selectedInactivities, selectedCandidateFilter, candidates, sortBy, sortDirection]);
+  }, [selectedEtapas, selectedStages, selectedAnswerFilters, selectedInactivities, selectedCandidateFilter, candidates, sortBy, sortDirection]);
 
   // Extrair colunas dinamicamente
   const dynamicColumns = useMemo(() => {
@@ -405,6 +407,16 @@ export const CandidatesTable = ({
                 Inatividade: {selectedInactivities.map((s) =>
                   s === 'finalized' ? 'Finalizados' : s === 'notFinalized' ? 'Não finalizados' : `${s} ${s === 1 ? 'dia' : 'dias'}`
                 ).join(', ')}
+                {totalCandidates !== undefined && (
+                  <span className="filter-count">
+                    ({displayedCandidates.length} de {totalCandidates})
+                  </span>
+                )}
+              </span>
+            )}
+            {selectedStages.length > 0 && (
+              <span className="filter-badge">
+                Stage: {selectedStages.join(', ')}
                 {totalCandidates !== undefined && (
                   <span className="filter-count">
                     ({displayedCandidates.length} de {totalCandidates})

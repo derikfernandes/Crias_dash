@@ -20,6 +20,7 @@ import { AUTH_HEADER } from './utils/api';
 import { QUESTIONS } from './utils/questions';
 import { getFormattedAnswer, getQuestionOptions } from './utils/answerMappings';
 import { getCandidateEtapa as getCandidateEtapaUtil } from './utils/etapaUtils';
+import { getFinalizationQuestionForStages } from './utils/finalizationRules';
 import { cache, getAnswersCacheKey, getCandidatesCacheKey } from './utils/cache';
 import { processInBatches } from './utils/batchProcessor';
 import type { CandidateStageRecord } from './types/candidateStage';
@@ -48,8 +49,11 @@ function App() {
   const [isExportingCompiled, setIsExportingCompiled] = useState(false);
   const [isExportingCandidate, setIsExportingCandidate] = useState(false);
   const [selectedEtapas, setSelectedEtapas] = useState<string[]>([]);
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedAnswerFilters, setSelectedAnswerFilters] = useState<{ question: number; answer: string }[]>([]);
   const [selectedInactivities, setSelectedInactivities] = useState<('finalized' | 'notFinalized' | number)[]>([]);
+  const [isLoadingStages, setIsLoadingStages] = useState(false);
+  const [stagesLoadProgress, setStagesLoadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
   const [answersError, setAnswersError] = useState<string | null>(null);
@@ -253,6 +257,7 @@ function App() {
       setAllCandidatesAnswersMap(new Map());
       setSelectedInstitution(null);
       setSelectedEtapas([]);
+      setSelectedStages([]);
       setSelectedAnswerFilters([]);
       setSelectedInactivities([]);
       setError(null);
@@ -330,6 +335,7 @@ function App() {
       setAnswers([]);
       setAnswersError(null);
       setSelectedEtapas([]);
+      setSelectedStages([]);
       setSelectedAnswerFilters([]);
       setSelectedInactivities([]);
       return;
@@ -345,6 +351,7 @@ function App() {
       setAnswers([]);
       setAnswersError(null);
       setSelectedEtapas([]);
+      setSelectedStages([]);
       setSelectedAnswerFilters([]);
       setSelectedInactivities([]);
     } else {
@@ -354,6 +361,7 @@ function App() {
       setAnswers([]);
       setAnswersError(null);
       setSelectedEtapas([]);
+      setSelectedStages([]);
       setSelectedAnswerFilters([]);
       setSelectedInactivities([]);
     }
@@ -442,6 +450,8 @@ function App() {
     const instId = selectedInstitution?.id;
     if (!isAuthenticated || !instId || candidates.length === 0) {
       setCandidateStagesMap(new Map());
+      setIsLoadingStages(false);
+      setStagesLoadProgress(0);
       return;
     }
 
@@ -449,16 +459,28 @@ function App() {
     let cancelled = false;
 
     const run = async () => {
+      setIsLoadingStages(true);
+      setStagesLoadProgress(0);
       try {
         const next = await fetchAllCandidateStagesMap(instId, candidates, {
           signal: ac.signal,
+          onProgress: (done, total) => {
+            if (cancelled || total === 0) return;
+            setStagesLoadProgress(Math.round((done / total) * 100));
+          },
         });
         if (!cancelled) {
           setCandidateStagesMap(next);
+          setStagesLoadProgress(100);
         }
       } catch {
         if (!cancelled) {
           setCandidateStagesMap(new Map());
+          setStagesLoadProgress(0);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingStages(false);
         }
       }
     };
@@ -603,6 +625,7 @@ function App() {
     setAllCandidatesAnswersMap(new Map());
     setSelectedInstitution(null);
     setSelectedEtapas([]);
+    setSelectedStages([]);
     setSelectedAnswerFilters([]);
     setSelectedInactivities([]);
     setError(null);
@@ -644,30 +667,46 @@ function App() {
   const filteredCandidates = useMemo(() => {
     let filtered = candidates;
 
-    // Filtro por inatividade (qualquer um selecionado = candidato deve bater em pelo menos um)
+    // Filtro por stage (OR)
+    if (selectedStages.length > 0) {
+      filtered = filtered.filter((candidate) => {
+        const stageName = getCandidateStageName(candidate.id);
+        return selectedStages.includes(stageName);
+      });
+    }
+
+    // Filtro por inatividade/finalizacao (qualquer um selecionado = candidato deve bater em pelo menos um)
     if (selectedInactivities.length > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const finalizationQuestion = getFinalizationQuestionForStages(selectedStages);
 
       filtered = filtered.filter((candidate) => {
         if (!candidate.id) return false;
-        const etapa = getCandidateEtapaUtil(candidate.id, allCandidatesAnswersMap);
-        const isFinalized = etapa === 'Finalizou';
+        const answers = allCandidatesAnswersMap.get(candidate.id) || [];
+        const isFinalized = answers.some(
+          (answer) =>
+            answer.question !== undefined && answer.question === finalizationQuestion
+        );
 
         return selectedInactivities.some((sel) => {
           if (sel === 'finalized') return isFinalized;
           if (sel === 'notFinalized') return !isFinalized;
           if (typeof sel === 'number') {
             if (isFinalized) return false;
-            const cid = candidate.id as string;
-            const answers = allCandidatesAnswersMap.get(cid) || [];
             let daysOfInactivity = 0;
             if (answers.length === 0) {
               if (candidate.createdAt) {
                 try {
                   const createdDate = new Date(candidate.createdAt);
                   createdDate.setHours(0, 0, 0, 0);
-                  daysOfInactivity = Math.max(0, Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
+                  daysOfInactivity = Math.max(
+                    0,
+                    Math.floor(
+                      (today.getTime() - createdDate.getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                  );
                 } catch (e) {
                   return false;
                 }
@@ -678,14 +717,21 @@ function App() {
                 if (answer.answeredAt) {
                   try {
                     const answerDate = new Date(answer.answeredAt);
-                    if (!lastAnswerDate || answerDate > lastAnswerDate) lastAnswerDate = answerDate;
+                    if (!lastAnswerDate || answerDate > lastAnswerDate)
+                      lastAnswerDate = answerDate;
                   } catch (e) {}
                 }
               });
               if (lastAnswerDate) {
                 const lastDate = new Date(lastAnswerDate);
                 lastDate.setHours(0, 0, 0, 0);
-                daysOfInactivity = Math.max(0, Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)));
+                daysOfInactivity = Math.max(
+                  0,
+                  Math.floor(
+                    (today.getTime() - lastDate.getTime()) /
+                      (1000 * 60 * 60 * 24)
+                  )
+                );
               }
             }
             return daysOfInactivity === sel;
@@ -719,7 +765,7 @@ function App() {
     }
 
     return filtered;
-  }, [candidates, selectedEtapas, selectedAnswerFilters, selectedInactivities, allCandidatesAnswersMap]);
+  }, [candidates, selectedEtapas, selectedStages, selectedAnswerFilters, selectedInactivities, allCandidatesAnswersMap, candidateStagesMap]);
 
   // Função para buscar todas as respostas de todos os candidatos (otimizada)
   const fetchAllAnswers = async (
@@ -1434,7 +1480,7 @@ function App() {
           .replace(/[^a-z0-9]/gi, '_')
           .toLowerCase();
         const filterSuffix =
-          selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0
+          selectedEtapas.length > 0 || selectedStages.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0
             ? '_filtro'
             : '';
         const date = new Date().toISOString().split('T')[0];
@@ -1485,7 +1531,7 @@ function App() {
           .replace(/[^a-z0-9]/gi, '_')
           .toLowerCase();
         const filterSuffix =
-          selectedEtapas.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0
+          selectedEtapas.length > 0 || selectedStages.length > 0 || selectedAnswerFilters.length > 0 || selectedInactivities.length > 0
             ? '_filtro'
             : '';
         const date = new Date().toISOString().split('T')[0];
@@ -1554,6 +1600,7 @@ function App() {
       setAllCandidatesAnswersMap(new Map());
       setSelectedInstitution(null);
       setSelectedEtapas([]);
+      setSelectedStages([]);
       setSelectedAnswerFilters([]);
       setSelectedInactivities([]);
       setError(null);
@@ -1617,9 +1664,11 @@ function App() {
                       selectedEtapas={selectedEtapas}
                     />
                     <InactivityChart
-                      institutionId={selectedInstitution.id}
                       candidates={candidates}
                       answersMap={allCandidatesAnswersMap}
+                      stageMap={candidateStagesMap}
+                      isLoadingStages={isLoadingStages}
+                      stagesLoadProgress={stagesLoadProgress}
                       onInactivityClick={(type) => {
                         if (type === null) return;
                         setSelectedInactivities((prev) => {
@@ -1631,6 +1680,14 @@ function App() {
                         });
                       }}
                       selectedInactivities={selectedInactivities}
+                      onStageClick={(stage) => {
+                        setSelectedStages((prev) =>
+                          prev.includes(stage)
+                            ? prev.filter((s) => s !== stage)
+                            : [...prev, stage]
+                        );
+                      }}
+                      selectedStages={selectedStages}
                     />
                     <AnswersChart
                       candidates={candidates}
@@ -1671,10 +1728,12 @@ function App() {
                 isExportingCompiled={isExportingCompiled}
                 answersMap={allCandidatesAnswersMap}
                 selectedEtapas={selectedEtapas}
+                selectedStages={selectedStages}
                 selectedAnswerFilters={selectedAnswerFilters}
                 selectedInactivities={selectedInactivities}
                 onClearFilter={() => {
                   setSelectedEtapas([]);
+                  setSelectedStages([]);
                   setSelectedAnswerFilters([]);
                   setSelectedInactivities([]);
                 }}
