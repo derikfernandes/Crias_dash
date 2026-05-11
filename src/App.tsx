@@ -896,10 +896,20 @@ function App() {
       'Dias da última mensagem',
     ];
 
-    const questionNumbers = Object.keys(QUESTIONS)
-      .map((k) => Number(k))
-      .filter((n) => !Number.isNaN(n))
-      .sort((a, b) => a - b);
+    const questionIdSet = new Set<number>();
+    Object.keys(QUESTIONS).forEach((k) => {
+      const n = Number(k);
+      if (!Number.isNaN(n)) questionIdSet.add(n);
+    });
+    candidates.forEach((c) => {
+      const list = answersMap.get(c.id || '') || [];
+      list.forEach((a) => {
+        if (a.question !== undefined && Number.isFinite(a.question)) {
+          questionIdSet.add(a.question);
+        }
+      });
+    });
+    const questionNumbers = Array.from(questionIdSet).sort((a, b) => a - b);
 
     const questionHeaders = questionNumbers.map(
       (q) => QUESTIONS[q] || `Questão ${q}`
